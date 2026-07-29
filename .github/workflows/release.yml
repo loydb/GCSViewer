@@ -53,7 +53,12 @@ jobs:
       # once: a binary four weeks behind the .py it was supposedly built from.
       - name: Verify the exe matches this commit's source
         run: |
-          python scripts/compare_exe_source.py dist/GCSViewer.exe gcs_viewer.py | Tee-Object -Variable out
+          # Out-String, not Tee-Object: a pipeline captured into a variable is
+          # an array of lines, and `-notmatch` against an array returns the
+          # non-matching *elements*, which is truthy whenever any other line
+          # exists - so the guard fired on a passing comparison.
+          $out = python scripts/compare_exe_source.py dist/GCSViewer.exe gcs_viewer.py | Out-String
+          Write-Host $out
           if ($out -notmatch "IDENTICAL") { throw "the built exe does not match gcs_viewer.py" }
 
       - name: Package the installable zip
