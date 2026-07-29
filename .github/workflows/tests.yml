@@ -46,8 +46,18 @@ jobs:
           GCS_VIEWER_NO_GUI: "1"
         run: python test_gui.py
 
+      # The Python suite checks the installer by reading it, which proves a
+      # line exists and nothing about what Windows ends up with.  This runs it
+      # for real against a throwaway ProgId, extension and app name, then reads
+      # the keys back - the missing default verb that broke double-click for
+      # five releases fails here from the registry rather than from a regex.
+      # Windows only; it cleans up after itself whether it passes or not.
+      - name: Run the installer and check what it registers
+        if: runner.os == 'Windows' && matrix.python == '3.12'
+        run: powershell -ExecutionPolicy Bypass -File scripts/test_installer.ps1
+
       # A green suite only means something if it can go red.  This
-      # reintroduces ten known defects and fails if any of them slips past.
+      # reintroduces known defects and fails if any of them slips past.
       - name: Mutation-check the suite
         if: matrix.python == '3.12'
         run: python scripts/mutation_check.py

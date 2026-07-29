@@ -5,6 +5,19 @@ Every release is built, self-tested and published by
 publish a tag that disagrees with `__version__` and refuses to ship an
 executable whose frozen code does not match the committed source.
 
+## 1.0.27
+
+- The installer is now tested by **running** it, not only by reading it:
+  `scripts/test_installer.ps1` installs against a throwaway ProgId,
+  extension, app name and shortcut, reads all 22 registrations back out of
+  the registry, then runs the uninstaller and checks every one is gone. It
+  touches no real association and cleans up even if a check throws. Verified
+  it can fail: deleting the default-verb line makes it report
+  `the ProgId's shell key names a default verb ... got ''`.
+- CI runs it on the Windows jobs. The textual checks stay — they catch a
+  removed line on Linux too — but a registry read is what actually proves
+  Windows ends up with a working file type.
+
 ## 1.0.26
 
 - **Removed the ProgId `Application` subkey added in 1.0.19, and repaired it on

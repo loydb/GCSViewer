@@ -400,6 +400,19 @@ That is not a guess. Run:
 python scripts/mutation_check.py
 ```
 
+The installer gets its own test, because it is shipped in both zips and had
+none — which is how a missing default verb reached five releases:
+
+```bash
+powershell -ExecutionPolicy Bypass -File scripts/test_installer.ps1
+```
+
+It installs against a throwaway ProgId, extension and app name, reads all 22
+registrations back out of the registry, runs the uninstaller and checks every
+one is gone. No real association is touched, and it cleans up even if a check
+throws. Reading the script would only prove a line exists; this proves Windows
+ends up with a file type that works.
+
 It reintroduces twenty-six deliberate defects one at a time — dropping the `.gem`
 Y mirror, painting nearest-first, ignoring the gear, losing the instruction
 text — and reports which checks catch each one. Currently **26 of 26**. The
