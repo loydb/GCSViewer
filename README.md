@@ -224,6 +224,7 @@ background, leaving a crown floating with no stone under it.
 
 ```bash
 python test_gcs_viewer.py     # 164 checks
+python test_gui.py            # 26 checks, the window itself
 ```
 
 No fixtures on disk and no third-party design files: every stone is
@@ -233,7 +234,14 @@ against files it already parses proves nothing about the format; round-tripping
 through an independent encoder pins the layout down.
 
 The suite covers both readers, the `write_gcs` round-trip, the tier table, the
-camera, shading, back-face culling, paint order and the command line. Two of
+camera, shading, back-face culling, paint order and the command line.
+`test_gui.py` covers what only the window owns — stepping through a folder
+with the arrow keys, wrapping, skipping designs it cannot read, the tilt
+limits, the toggles and saving — by driving the real widgets and pumping Tk's
+event loop by hand rather than calling `mainloop()`. It skips itself where Tk
+has no display, so headless runners stay green without xvfb, and the mutation
+harness reports its three window-only defects as *unjudged* there rather than
+pretending they passed. Two of
 those need scenes built specifically to break convexity — a convex stone hides
 its own back faces *and* tiles its silhouette without overlap, so on a real gem
 you can disable the cull or reverse the depth sort without changing a single
@@ -245,9 +253,9 @@ That is not a guess. Run:
 python scripts/mutation_check.py
 ```
 
-It reintroduces nineteen deliberate defects one at a time — dropping the `.gem`
+It reintroduces twenty-two deliberate defects one at a time — dropping the `.gem`
 Y mirror, painting nearest-first, ignoring the gear, losing the instruction
-text — and reports which checks catch each one. Currently **19 of 19**. The
+text — and reports which checks catch each one. Currently **22 of 22**. The
 first run of this harness found three that survived, which is how the culling
 and paint-order scenes came to exist.
 

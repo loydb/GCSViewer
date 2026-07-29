@@ -38,6 +38,14 @@ jobs:
           GCS_VIEWER_NO_GUI: "1"
         run: python test_gcs_viewer.py
 
+      # Drives the real window with a hand-pumped event loop rather than
+      # mainloop(), so it runs unattended.  It skips itself where Tk has no
+      # display, which keeps the headless Linux runners green without xvfb.
+      - name: Run windowed tests
+        env:
+          GCS_VIEWER_NO_GUI: "1"
+        run: python test_gui.py
+
       # A green suite only means something if it can go red.  This
       # reintroduces ten known defects and fails if any of them slips past.
       - name: Mutation-check the suite

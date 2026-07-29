@@ -5,6 +5,17 @@ Every release is built, self-tested and published by
 publish a tag that disagrees with `__version__` and refuses to ship an
 executable whose frozen code does not match the committed source.
 
+## 1.0.13
+
+- `test_gui.py`: 26 checks on the part of the program a user actually
+  operates — stepping through a folder with the arrow keys, wrapping past the
+  ends, skipping designs it cannot read, the tilt limits, the toggles, and
+  saving. It drives the real widgets and pumps Tk's event loop by hand, and
+  skips itself where there is no display.
+- The mutation harness runs both suites and judges three window-only defects,
+  reporting them as *unjudged* rather than passed where Tk cannot open. 22 of
+  22 caught.
+
 ## 1.0.12
 
 - **Converting a `.gem` no longer drops cutting steps.** `write_gcs` wrote the

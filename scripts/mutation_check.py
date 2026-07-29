@@ -80,15 +80,54 @@ MUTATIONS = [
     ("freeze the top view to the legacy basis, breaking az rotation",
      "right = np.array([ca, sa, 0.0])",
      "right = np.array([1.0, 0.0, 0.0])"),
+
+    # these can only be judged where Tk has a display; on a headless runner
+    # the GUI suite skips itself and they are reported as unjudged
+    ("step through the folder in one direction whatever key is pressed",
+     "cand = files[(idx + direction * k) % n]",
+     "cand = files[(idx + k) % n]"),
+    ("stop the folder walk at the first unreadable design",
+     "            except Exception:\n                continue",
+     "            except Exception:\n                break"),
+    ("let the 3/4 view tilt past vertical",
+     "self.el = max(-88.0, min(88.0, self.el + dele))",
+     "self.el = self.el + dele"),
 ]
+
+# labels above that only the windowed suite can catch
+GUI_ONLY = {
+    "step through the folder in one direction whatever key is pressed",
+    "stop the folder walk at the first unreadable design",
+    "let the 3/4 view tilt past vertical",
+}
 
 
 def run(cwd):
-    env = dict(os.environ, GCS_VIEWER_NO_GUI="1")
-    p = subprocess.run([sys.executable, "test_gcs_viewer.py"], cwd=cwd,
-                       env=env, capture_output=True, text=True, timeout=900)
-    failed = re.findall(r"^  FAIL (.+?)   ", p.stdout, re.M)
-    return p.returncode, failed
+    """Both suites.  A mutation is caught if either of them goes red.
+
+    UTF-8 on both sides of the pipe, deliberately.  A failing check prints
+    the detail that failed, and this program's own text is full of arrows,
+    bullets and accented design names; through a pipe Python defaults to the
+    console code page, and one undecodable byte kills the reader thread and
+    hands back `stdout=None` - which looks like a crash in the harness rather
+    than what it is.
+    """
+    env = dict(os.environ, GCS_VIEWER_NO_GUI="1", PYTHONIOENCODING="utf-8")
+    rc, failed, gui_ran = 0, [], False
+    for suite in ("test_gcs_viewer.py", "test_gui.py"):
+        if not os.path.exists(os.path.join(cwd, suite)):
+            continue
+        p = subprocess.run([sys.executable, suite], cwd=cwd, env=env,
+                           capture_output=True, encoding="utf-8",
+                           errors="replace", timeout=900)
+        rc = rc or p.returncode
+        failed += re.findall(r"^  FAIL (.+?)   ", p.stdout, re.M)
+        if suite == "test_gui.py":
+            # the exact banner, not the word: one of the checks is named
+            # "an unreadable design is skipped, not fatal", which made a
+            # perfectly good run look like it had skipped itself
+            gui_ran = "skipped: Tk has no display" not in p.stdout
+    return rc, failed, gui_ran
 
 
 def main():
@@ -97,30 +136,37 @@ def main():
         original = fh.read()
 
     tmp = tempfile.mkdtemp(prefix="gcsviewer-mutants-")
-    shutil.copy2(os.path.join(HERE, "test_gcs_viewer.py"), tmp)
+    for suite in ("test_gcs_viewer.py", "test_gui.py"):
+        if os.path.exists(os.path.join(HERE, suite)):
+            shutil.copy2(os.path.join(HERE, suite), tmp)
     target = os.path.join(tmp, "gcs_viewer.py")
 
     shutil.copy2(src, target)
-    rc, failed = run(tmp)
+    rc, failed, gui_ran = run(tmp)
     if rc != 0:
         print("the unmutated suite already fails - fix that first:")
         print("  " + "\n  ".join(failed))
         return 1
-    print("baseline: suite passes\n")
+    print("baseline: suites pass%s\n"
+          % ("" if gui_ran else " (no display: the windowed suite skipped)"))
 
-    survivors = []
+    survivors, unjudged = [], []
     for label, find, repl in MUTATIONS:
         if find not in original:
             print("SKIP  %s\n      (anchor no longer in the source: %r)"
                   % (label, find[:60]))
             survivors.append(label + " [stale anchor]")
             continue
+        if label in GUI_ONLY and not gui_ran:
+            print("unjudged  %s\n          (needs a display)" % label)
+            unjudged.append(label)
+            continue
         # every occurrence, not just the first: the .gem Y mirror appears
         # twice, and mutating only one of them leaves the geometry correct -
         # which reads as a surviving mutation when it is really a weak one
         with open(target, "w", encoding="utf-8") as fh:
             fh.write(original.replace(find, repl))
-        rc, failed = run(tmp)
+        rc, failed, _ = run(tmp)
         if rc == 0:
             print("SURVIVED  %s" % label)
             survivors.append(label)
@@ -135,8 +181,11 @@ def main():
                 print("          suite errored out rather than reporting")
 
     shutil.rmtree(tmp, ignore_errors=True)
-    print("\n%d/%d mutations caught" % (len(MUTATIONS) - len(survivors),
-                                        len(MUTATIONS)))
+    judged = len(MUTATIONS) - len(unjudged)
+    print("\n%d/%d mutations caught%s"
+          % (judged - len(survivors), judged,
+             " (%d unjudged without a display)" % len(unjudged)
+             if unjudged else ""))
     for s in survivors:
         print("  SURVIVOR: %s" % s)
     return 1 if survivors else 0
