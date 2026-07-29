@@ -9,8 +9,28 @@ and a **3/4 view you can spin** — plus a **cutting-instructions table**
 **Left/Right arrows step through the other designs in the folder.**
 After installing, **double-clicking a `.gcs` or `.gem` file opens the viewer.**
 
-The viewer is a **single standalone program** — there is nothing else to
-install. No Python, no libraries, no admin rights.
+There is nothing else to install. No Python, no libraries, no admin rights —
+the interpreter and every library the viewer needs are inside it.
+
+---
+
+## Which download to take
+
+Both are the same program, packaged two ways.
+
+| | Starts in | Size on disk | Best for |
+|---|---|---|---|
+| **`GCSViewer.exe`** on its own | ~1.5 s | one 30 MB file | keeping on a USB stick, emailing to somebody, trying it out |
+| **`GCSViewer-<version>-windows-folder.zip`** | ~0.4 s | ~70 MB in a folder | actually using it day to day |
+
+The single file has to unpack its whole contents into `%TEMP%` **every time it
+runs** — that is where the extra second goes, and it happens on every launch,
+not just the first. The folder version is already unpacked. It is also the one
+to use on a locked-down machine where policy stops programs running from
+`%TEMP%`.
+
+If you took the single `.exe` on its own, you can still register it — see
+below — but you will want `Install-GcsViewer.ps1` from either zip.
 
 ---
 
@@ -18,10 +38,13 @@ install. No Python, no libraries, no admin rights.
 
 | File | Purpose |
 |------|---------|
-| `GCSViewer.exe` | The viewer — a complete, self-contained program. |
+| `GCSViewer.exe` | The viewer. |
 | `Install-GcsViewer.ps1` | Registers the "GCS Viewer" app for `.gcs` and `.gem` files. |
 | `Uninstall-GcsViewer.ps1` | Removes the app registration. |
 | `INSTALL.md` | This document. |
+
+The folder download also contains an `_internal` folder full of libraries.
+Leave it alone — the viewer will not start without it.
 
 Nothing here needs administrator rights — everything installs for the
 current user only.
@@ -31,12 +54,13 @@ current user only.
 ## Install the viewer
 
 1. **Extract** this zip to a permanent location — for example
-   `C:\Tools\gcs-viewer\`. The viewer runs from wherever you put it, so don't
+   `C:\Tools\GCSViewer\`. The viewer runs from wherever you put it, so don't
    delete the folder afterward.
-2. Open **PowerShell** and change into that folder, e.g.:
+2. Open **PowerShell** and change into the folder that contains
+   `GCSViewer.exe`, e.g.:
 
    ```powershell
-   cd C:\Tools\gcs-viewer
+   cd C:\Tools\GCSViewer
    ```
 
 3. Run the installer:
@@ -46,7 +70,8 @@ current user only.
    ```
 
    This registers a **"GCS Viewer"** application for `.gcs` **and** `.gem`
-   files. (It does not copy any files or change anything else.)
+   files, and gives those files a gem icon in Explorer instead of a blank
+   page. (It does not copy any files or change anything else.)
 
    > **Tip:** if PowerShell blocks the script, the `-ExecutionPolicy Bypass`
    > above already handles it. You do **not** need to run as Administrator.
@@ -72,10 +97,9 @@ current user only.
    > Windows blocks programs from setting themselves as the default for a file
    > type — only you can, through this dialog. That's why this step is manual.
 
-> **First launch note:** the very first time the viewer opens it may take a
-> few extra seconds (it unpacks itself), and Windows SmartScreen may ask if
-> you want to run it — click **More info → Run anyway**. Both happen only
-> once.
+> **First launch note:** Windows SmartScreen may ask whether you want to run
+> an unsigned program downloaded from the internet — click
+> **More info → Run anyway**. That happens once.
 
 ---
 
@@ -83,6 +107,7 @@ current user only.
 
 - **Left / Right arrows** — step to the previous / next `.gcs` or `.gem` file
   in the same folder (wraps around), just like the Windows photo viewer.
+  Files it cannot read are skipped rather than stopping the walk.
 - **Drag** the 3/4 view with the mouse to spin the stone.
 - **Up / Down arrows** — tilt the 3/4 view.
 - **I** — toggle the **Instructions** table below the renders (tier name,
@@ -90,9 +115,14 @@ current user only.
   into Pavilion and Crown — like the Gem Cut Studio sequence panel).
 - **G** — toggle grayscale / colour.
 - **L** — toggle the tier labels (T, C1, P1, …).
-- **S** — save the current views (with the instructions table) as a PNG.
+- **S** — save the current views (with the instructions table) as a PNG next
+  to the design. Nothing is ever written to the design file itself.
 - **R** — reset the 3/4 angle.
 - **Esc** or **Q** — close.
+
+A panel that reads **"no facets face this view"** is not a fault. A preform —
+a stone with the girdle and pavilion cut but no crown yet — has nothing at all
+facing the table view, so there is genuinely nothing to draw.
 
 ### Command line (optional)
 
@@ -106,6 +136,9 @@ current user only.
 # grayscale, or hide tier labels
 .\GCSViewer.exe "C:\path\to\stone.gcs" --save --gray --no-labels
 
+# which build is this?  (also shown in the window's title bar)
+.\GCSViewer.exe --version
+
 # check the program itself is intact - renders a stone it builds in memory
 .\GCSViewer.exe --selftest report.txt
 ```
@@ -118,9 +151,13 @@ message box that nobody is there to dismiss.
 
 ## Updating
 
-Replace `GCSViewer.exe` in the install folder with the new version. The file
-association points at that path, so no re-install is needed. (If you move the
-folder, re-run `Install-GcsViewer.ps1` from the new location.)
+Replace `GCSViewer.exe` in the install folder with the new version — for the
+folder build, replace the whole folder. The file association points at that
+path, so no re-install is needed as long as the name and location stay the
+same. (If you move it, re-run `Install-GcsViewer.ps1` from the new location.)
+
+To check what you are running, look at the window's title bar, or run
+`.\GCSViewer.exe --version`.
 
 ---
 
@@ -135,6 +172,11 @@ powershell -ExecutionPolicy Bypass -File .\Uninstall-GcsViewer.ps1
 This removes the `.gcs` and `.gem` associations. Then simply delete the
 folder — the viewer doesn't install anything anywhere else.
 
+If you had set it as the *default* with "Always use this app", Windows keeps
+that choice in a protected setting the script cannot remove; clear it in
+**Settings → Apps → Default apps**, or just pick a different program with
+**Open with → Choose another app**.
+
 ---
 
 ## Troubleshooting
@@ -142,12 +184,15 @@ folder — the viewer doesn't install anything anywhere else.
 | Symptom | Fix |
 |---------|-----|
 | Windows SmartScreen: "Windows protected your PC" | Click **More info → Run anyway** (first launch only). |
-| First launch is slow | Normal — the program unpacks itself the first time. Later launches are faster. |
+| Every launch takes a second or so | Expected of the single-file build — it unpacks itself each time. Use the folder download instead. |
 | Double-click opens a different program | Re-set the default with **Open with → Choose another app** (see above). |
-| "No facets found in file" | The file isn't a valid Gemcut Studio `.gcs`, or is empty/corrupt. |
+| Not sure which version you have | Look at the title bar, or run `.\GCSViewer.exe --version`. |
+| "The file is empty (0 bytes)" | The file really is empty — nothing to show. Restore it from a backup. |
+| "No facets found in file" | The file isn't a valid design, or is corrupt. |
+| A panel says "no facets face this view" | Not a fault — see above. |
 | Nothing happens on double-click | Run `.\GCSViewer.exe "yourfile.gcs" --save` in PowerShell and check for an error window. |
 
 ---
 
-*GCS Viewer is an independent viewer and is not affiliated with Gemcut Studio
-or SingleCellSoftware.*
+*GCS Viewer is an independent viewer and is not affiliated with Gemcut Studio,
+Gem Cut Studio, GemCad or their authors.*
