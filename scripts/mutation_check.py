@@ -115,6 +115,13 @@ GUI_ONLY = {
     "bind grayscale to the wrong key",
 }
 
+# labels that only a platform whose native line ending is not LF can catch:
+# dropping newline="\n" changes nothing where text mode already writes LF, so
+# the mutation is a no-op on Linux and would be reported as a survivor there
+WINDOWS_ONLY = {
+    "let the platform decide the line endings of what we write",
+}
+
 
 def run(cwd):
     """Both suites.  A mutation is caught if either of them goes red.
@@ -173,6 +180,11 @@ def main():
             continue
         if label in GUI_ONLY and not gui_ran:
             print("unjudged  %s\n          (needs a display)" % label)
+            unjudged.append(label)
+            continue
+        if label in WINDOWS_ONLY and os.name != "nt":
+            print("unjudged  %s\n          (no-op where text mode already "
+                  "writes LF)" % label)
             unjudged.append(label)
             continue
         # every occurrence, not just the first: the .gem Y mirror appears
