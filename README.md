@@ -192,7 +192,7 @@ background, leaving a crown floating with no stone under it.
 ## Tests
 
 ```bash
-python test_gcs_viewer.py     # 107 checks
+python test_gcs_viewer.py     # 124 checks
 ```
 
 No fixtures on disk and no third-party design files: every stone is
@@ -214,9 +214,9 @@ That is not a guess. Run:
 python scripts/mutation_check.py
 ```
 
-It reintroduces eleven deliberate defects one at a time — dropping the `.gem`
+It reintroduces thirteen deliberate defects one at a time — dropping the `.gem`
 Y mirror, painting nearest-first, ignoring the gear, losing the instruction
-text — and reports which checks catch each one. Currently **11 of 11**. The
+text — and reports which checks catch each one. Currently **13 of 13**. The
 first run of this harness found three that survived, which is how the culling
 and paint-order scenes came to exist.
 
@@ -228,20 +228,34 @@ python scripts/corpus_scan.py "D:\designs" --render 150 --roundtrip
 
 Synthetic stones prove the format; they cannot prove twenty years of files
 written by other people's programs. This parses every `.gcs` and `.gem` under
-a folder, classifies each one, and appends rows as it goes so an interrupted
-run keeps what it learned.
+a folder, classifies each one, and — with `--roundtrip` — writes it back out
+through `write_gcs` and re-reads it. Rows are appended as they are produced,
+so an interrupted run keeps what it learned.
 
-On the reference collection here — **8,128 files, 7,883 `.gcs` and 245
-`.gem`** — there are **no parse failures and no malformed geometry**. Twelve
-designs contain facets with no area, which is a property of those designs
-rather than a fault in reading them. A 150-design render sample completed
-without a failure.
+Run over a reference collection of **10,249 designs**, it found four things
+the synthetic suite could not, all now fixed:
 
-It also found a real one. In a `.gem` the instruction belongs to the facet
-that *begins* a cutting step, and a tier can hold several steps — Alcyone's
-tier `a` is both "Match g1, establish upper girdle line" and "Meet g1.a.a.g1".
-The table used to read the first facet and stop, dropping **144 instruction
-lines across 56 of the 245 `.gem` files**. It now collects them in order.
+- **A design whose title is not ASCII would not open at all.** Gem Cut Studio
+  writes the file in the machine's code page and declares no encoding, so
+  *Viet Gems 216 — Fleur en rêve* was rejected as malformed XML over one byte
+  in its title. The reader now falls back through the Windows code pages.
+- **Cutting steps were being dropped.** In a `.gem` the instruction belongs to
+  the facet that *begins* a step, and a tier can hold several — Alcyone's tier
+  `a` is both "Match g1, establish upper girdle line" and "Meet g1.a.a.g1".
+  The table read the first facet and stopped: **144 lines lost across 56 of
+  the 245 `.gem` files**.
+- **`write_gcs` merged tiers that share a name.** Two `<tier>` elements may
+  carry the same name, and four designs do; one was rewritten from seven tiers
+  to one. Tier boundaries now follow the element, not the label — but only
+  where that splits a tier, never where it would merge two.
+- **Zero-byte files reported "no element found: line 1, column 0."** Twelve of
+  them sit in the collection. They are still unreadable, but now they say so.
+
+What it did not find matters too: across those files there are no other parse
+failures, no malformed geometry, and every one of them round-trips through
+`write_gcs` with **vertices bit-exact**. Thirteen designs contain facets with
+no area, which is a property of those designs rather than a fault in reading
+them. A 150-design render sample completed without a failure.
 
 ## A note for the solver
 

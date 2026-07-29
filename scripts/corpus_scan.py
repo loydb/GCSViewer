@@ -146,7 +146,7 @@ def roundtrip(path, tmpdir):
         return row
 
     wv = wn = 0.0
-    tier_bad = instr_bad = 0
+    tier_bad = 0
     for a, b in zip(facets, back):
         va, vb = np.asarray(a["verts"], float), np.asarray(b["verts"], float)
         if va.shape != vb.shape:
@@ -158,8 +158,29 @@ def roundtrip(path, tmpdir):
                                   np.asarray(b["normal"], float)).max()))
         if (a.get("tier", "") or "") != (b.get("tier", "") or ""):
             tier_bad += 1
-        if (a.get("instr", "") or "") != (b.get("instr", "") or ""):
-            instr_bad += 1
+
+    # Instructions cannot be compared facet by facet.  A .gem carries the text
+    # on the facet that starts a cutting step and leaves the rest blank; .gcs
+    # stores one string per tier, which parse_gcs then copies onto every
+    # facet.  Moving between those two shapes is the format's doing and loses
+    # nothing.  What would be a real loss is a *distinct* step disappearing,
+    # so the comparison is between the ordered sets of instructions per tier.
+    def steps(fs):
+        runs, out = [], []
+        for x in fs:
+            k = x.get("tid", x.get("tier", ""))
+            if not runs or runs[-1][0] != k:
+                runs.append((k, []))
+            runs[-1][1].append((x.get("instr", "") or "").strip())
+        for _, ins in runs:
+            out.append([s for s in dict.fromkeys(ins) if s])
+        return out
+
+    a_steps, b_steps = steps(facets), steps(back)
+    dropped = 0
+    if len(a_steps) == len(b_steps):
+        for xs, ys in zip(a_steps, b_steps):
+            dropped += len([s for s in xs if s not in ys])
 
     row["worst_vertex"] = "%.3g" % wv
     row["worst_normal"] = "%.3g" % wn
@@ -170,10 +191,19 @@ def roundtrip(path, tmpdir):
         problems.append("normals moved by %.3g" % wn)
     if tier_bad:
         problems.append("%d tier names changed" % tier_bad)
-    if instr_bad:
-        problems.append("%d instructions changed" % instr_bad)
-    row["verdict"] = "OK" if not problems else "MISMATCH"
-    row["detail"] = "; ".join(problems)
+    if len(a_steps) != len(b_steps):
+        problems.append("tier count %d -> %d" % (len(a_steps), len(b_steps)))
+
+    if problems:
+        row["verdict"] = "MISMATCH"
+        row["detail"] = "; ".join(problems)
+    elif dropped:
+        # write_gcs writes one instruction per tier, taken from the facet that
+        # opens it, so a tier holding several steps keeps only the first
+        row["verdict"] = "INSTR-LOST"
+        row["detail"] = "%d cutting step(s) not carried into the .gcs" % dropped
+    else:
+        row["verdict"] = "OK"
     return row
 
 

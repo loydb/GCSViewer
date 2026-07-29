@@ -226,6 +226,61 @@ def test_parse_gcs(tmp):
           v.shape == (4, 3) and near(v[0][0], -0.5) and near(v[2][1], 0.5))
 
 
+def test_parse_gcs_encodings(tmp):
+    """Gem Cut Studio writes the file in the machine's code page without
+    declaring one, so a design titled in anything but ASCII is not valid
+    UTF-8.  One file in the reference collection - a Vietnamese designer's
+    "Fleur en reve" - failed to open at all because of a single byte in the
+    title."""
+    title = "Viet Gems 216 - Fleur en rêve"
+    xml = GCS_XML.replace('title="Synthetic"', 'title="%s"' % title)
+
+    p = os.path.join(tmp, "cp1252.gcs")
+    with open(p, "wb") as fh:
+        fh.write(xml.encode("cp1252"))
+    try:
+        facets, info, _ = gv.parse_gcs(p)
+    except Exception as e:                     # noqa: BLE001
+        check("encoding: a code-page title no longer rejects the whole file",
+              False, "%s: %s" % (type(e).__name__, e))
+        facets, info = [], {}
+    check("encoding: a code-page title no longer rejects the whole file",
+          len(facets) == 2, len(facets))
+    check("encoding: the accented title is recovered intact",
+          info.get("title") == title, info.get("title"))
+
+    p = os.path.join(tmp, "utf8.gcs")
+    with open(p, "wb") as fh:
+        fh.write(xml.encode("utf-8"))
+    _, info8, _ = gv.parse_gcs(p)
+    check("encoding: plain UTF-8 still reads as before",
+          info8.get("title") == title, info8.get("title"))
+
+    p = os.path.join(tmp, "bom.gcs")
+    with open(p, "wb") as fh:                      # BOM first, then the decl
+        fh.write(b"\xef\xbb\xbf" +
+                 b'<?xml version="1.0" encoding="utf-8"?>\n' +
+                 xml.encode("utf-8"))
+    _, infob, _ = gv.parse_gcs(p)
+    check("encoding: a BOM and an XML declaration are both tolerated",
+          infob.get("title") == title, infob.get("title"))
+
+
+def test_empty_files(tmp):
+    """Twelve zero-byte files sit in the reference collection.  Nothing can
+    be done with them, but the reason should say so rather than talking
+    about line 1, column 0."""
+    for name in ("empty.gcs", "empty.gem"):
+        p = os.path.join(tmp, name)
+        open(p, "wb").close()
+        try:
+            gv.load_design(p)
+            check("empty %s: raises" % name, False, "no exception")
+        except Exception as e:                 # noqa: BLE001
+            check("empty %s: says the file is empty" % name,
+                  "empty" in str(e).lower(), str(e))
+
+
 def test_parse_gcs_bad_normal(tmp):
     """A zero or non-finite normal must fall back to the polygon's own."""
     p = os.path.join(tmp, "bad_normal.gcs")
@@ -283,6 +338,55 @@ def test_write_gcs_roundtrip(tmp):
           tiers)
     check("roundtrip: crown tier angle < 90", 0.0 < tiers["C1"] < 90.0, tiers)
     check("roundtrip: table tier angle == 0", near(tiers["T"], 0.0, 1e-9), tiers)
+
+
+def test_write_gcs_same_named_tiers(tmp):
+    """Two <tier> elements are allowed to carry the same name, and four
+    designs in the reference collection do.  Grouping the output by name
+    alone rewrote one of them - seven tiers - as a single tier."""
+    facets = []
+    for tid, (angle, instr) in enumerate([(43.0, "Cut to a center point"),
+                                          (41.0, "Meet 1.g1.1"),
+                                          (39.0, "Meet 1.1.2")]):
+        for f in cone_facets(8, angle, tier="P1", instr=instr):
+            f["tid"] = tid
+            facets.append(f)
+
+    p = os.path.join(tmp, "samename.gcs")
+    gv.write_gcs(p, facets, {"title": "Same Name"}, {"color": (.5, .5, .5)})
+    import xml.etree.ElementTree as ET
+    tiers = list(ET.parse(p).iter("tier"))
+    check("same-named tiers: three tiers written, not one", len(tiers) == 3,
+          len(tiers))
+    check("same-named tiers: each keeps its own instruction",
+          [t.get("instructions") for t in tiers] ==
+          ["Cut to a center point", "Meet 1.g1.1", "Meet 1.1.2"],
+          [t.get("instructions") for t in tiers])
+    check("same-named tiers: each keeps its own facets",
+          [len(t.findall("facet")) for t in tiers] == [8, 8, 8],
+          [len(t.findall("facet")) for t in tiers])
+
+    back, _, _ = gv.parse_gcs(p)
+    check("same-named tiers: survive a round trip", len(back) == len(facets))
+    check("same-named tiers: re-read as three tiers",
+          len({f["tid"] for f in back}) == 3)
+
+    # a caller that supplies no tid must get exactly the old behaviour, since
+    # every solver script that writes through here builds facets without one
+    plain = [{k: v for k, v in f.items() if k != "tid"} for f in facets]
+    q = os.path.join(tmp, "notid.gcs")
+    gv.write_gcs(q, plain, {"title": "No Tid"}, {"color": (.5, .5, .5)})
+    check("no-tid callers still group by name, unchanged",
+          len(list(ET.parse(q).iter("tier"))) == 1,
+          len(list(ET.parse(q).iter("tier"))))
+
+    # and a tid that says nothing must not be allowed to merge real tiers
+    flat = [dict(f, tid=0) for f in facets]
+    r = os.path.join(tmp, "flattid.gcs")
+    gv.write_gcs(r, flat, {"title": "Flat Tid"}, {"color": (.5, .5, .5)})
+    check("a constant tid cannot merge what the names separate",
+          len(list(ET.parse(r).iter("tier"))) == 1,
+          len(list(ET.parse(r).iter("tier"))))
 
 
 # ---------------------------------------------------------------------------
@@ -756,8 +860,11 @@ def main():
     print("gcs_viewer self-checks\n")
     with tempfile.TemporaryDirectory() as tmp:
         test_parse_gcs(tmp)
+        test_parse_gcs_encodings(tmp)
+        test_empty_files(tmp)
         test_parse_gcs_bad_normal(tmp)
         test_write_gcs_roundtrip(tmp)
+        test_write_gcs_same_named_tiers(tmp)
         test_parse_gem(tmp)
         test_parse_gem_long_notes(tmp)
         test_parse_gem_no_trailing(tmp)

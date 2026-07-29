@@ -23,6 +23,9 @@ import tempfile
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 MUTATIONS = [
+    ("give up on a .gcs that is not valid UTF-8",
+     'for enc in ("utf-8-sig", "cp1252", "latin-1"):',
+     'for enc in ():'),
     ("drop the .gem Y mirror",
      "* np.array([1.0, -1.0, 1.0])",
      "* np.array([1.0, 1.0, 1.0])"),
@@ -47,6 +50,9 @@ MUTATIONS = [
     ("skip the trailing strings in .gem (the 2026-07-13 title/notes work)",
      'info["title"] = trailing[0].strip()',
      'info["title"] = ""'),
+    ("merge two same-named tiers into one on write",
+     "        if len(by_tid) > len(by_name):\n            boundaries = by_tid",
+     "        if False:\n            boundaries = by_tid"),
     ("write vertices at reduced precision",
      "return repr(float(x))",
      'return "%.3f" % float(x)'),
@@ -102,7 +108,13 @@ def main():
             survivors.append(label)
         else:
             print("caught    %s" % label)
-            print("          %d check(s), first: %s" % (len(failed), failed[0]))
+            if failed:
+                print("          %d check(s), first: %s"
+                      % (len(failed), failed[0]))
+            else:
+                # a non-zero exit with no FAIL lines means the mutant made the
+                # suite raise rather than report - still caught, less useful
+                print("          suite errored out rather than reporting")
 
     shutil.rmtree(tmp, ignore_errors=True)
     print("\n%d/%d mutations caught" % (len(MUTATIONS) - len(survivors),

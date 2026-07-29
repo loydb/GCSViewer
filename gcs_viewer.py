@@ -36,6 +36,41 @@ from PIL import Image, ImageDraw, ImageFont
 # Parsing
 # ----------------------------------------------------------------------------
 
+_XML_DECL = re.compile(r"^\s*<\?xml[^>]*\?>")
+
+
+def _read_xml(path):
+    """Parse a .gcs into an element tree, tolerating what really turns up.
+
+    Gem Cut Studio writes the file in the machine's own code page and does
+    not declare an encoding, so a design whose title or author contains a
+    non-ASCII character - "Fleur en reve", "Muller" - is not valid UTF-8 and
+    a strict parse rejects the whole file.  Falling back through the usual
+    Windows code pages recovers it; nothing else in the format is affected,
+    because the geometry is all ASCII digits.
+    """
+    try:
+        return ET.parse(path).getroot()
+    except ET.ParseError:
+        with open(path, "rb") as fh:
+            data = fh.read()
+        if not data.strip():
+            raise ValueError("The file is empty (0 bytes).")
+        for enc in ("utf-8-sig", "cp1252", "latin-1"):
+            try:
+                text = data.decode(enc)
+            except (UnicodeDecodeError, LookupError):
+                continue
+            # already decoded, so an encoding declaration would now be a lie
+            # and ElementTree refuses to parse a str that carries one
+            text = _XML_DECL.sub("", text, count=1)
+            try:
+                return ET.fromstring(text)
+            except ET.ParseError:
+                continue
+        raise
+
+
 def parse_gcs(path):
     """Return (facets, info, material).
 
@@ -43,8 +78,7 @@ def parse_gcs(path):
     info     : dict from the <info> element
     material : dict with 'color' (r,g,b in 0..1) and any render attributes
     """
-    tree = ET.parse(path)
-    root = tree.getroot()
+    root = _read_xml(path)
 
     gear = 96.0
     iel = root.find("index")
@@ -146,6 +180,8 @@ def _newell(V):
 
 def parse_gem(path):
     B = open(path, "rb").read()
+    if not B:
+        raise ValueError("The file is empty (0 bytes).")
 
     def str_at(p):
         if p < 0 or p >= len(B):
@@ -295,8 +331,35 @@ def write_gcs(path, facets, info, material, gear=96):
     root = ET.Element("GemCutStudio", version="1000")
     ET.SubElement(root, "index", gear=gear_s, base="0", symmetry="0", mirror="0")
 
+    # Tiers are delimited by consecutive facets sharing a tier name.  That is
+    # wrong for the handful of designs that give two different <tier> elements
+    # the same name - four of the 8,128 files in the reference collection do,
+    # and one of them rewrote seven tiers as one.  Where the facets carry the
+    # tid parse_gcs assigns per element, that is the better key.
+    #
+    # It is only adopted when it produces MORE tiers than the names do, so
+    # this can split a tier that should never have been merged and can never
+    # merge two that belong apart.  Callers that build facets without a tid -
+    # every solver script that writes through here does - are unaffected.
+    def runs(key):
+        out, prev = [], object()
+        for f in facets:
+            k = key(f)
+            if k != prev:
+                out.append(0)
+                prev = k
+            out[-1] += 1
+        return out
+
+    by_name = runs(lambda f: f.get("tier", "") or "")
+    boundaries = by_name
+    if all("tid" in f for f in facets):
+        by_tid = runs(lambda f: (f["tid"], f.get("tier", "") or ""))
+        if len(by_tid) > len(by_name):
+            boundaries = by_tid
+
     i = 0
-    while i < len(facets):
+    for run_len in boundaries:
         tier = facets[i].get("tier", "") or ""
         instr = facets[i].get("instr", "") or ""
         # Tier angle/depth tell Gem Cut Studio which section a tier belongs to:
@@ -311,7 +374,7 @@ def write_gcs(path, facets, info, material, gear=96):
         te = ET.SubElement(root, "tier", angle=repr(t_angle), depth=repr(t_depth),
                            name=tier, instructions=instr, visible="true",
                            guide="false")
-        while i < len(facets) and (facets[i].get("tier", "") or "") == tier:
+        for _ in range(run_len):
             f = facets[i]
             n = f["normal"]
             fe = ET.SubElement(te, "facet", nx=fmt(n[0]), ny=fmt(n[1]),
