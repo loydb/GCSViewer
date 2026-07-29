@@ -5,6 +5,16 @@ Every release is built, self-tested and published by
 publish a tag that disagrees with `__version__` and refuses to ship an
 executable whose frozen code does not match the committed source.
 
+## 1.0.20
+
+- **The app now appears in Settings → Apps → Default apps.** The ProgId had
+  no `Application` subkey, which is how a ProgId declares itself an
+  application rather than a file type with a handler — and that Settings page
+  builds its per-extension list from ProgIds, naming each from that subkey.
+  With 1.0.19's Default Programs registration this makes three separate
+  registrations, one per place Windows might offer the app; the README has
+  the table.
+
 ## 1.0.19
 
 - **The installer now registers the app with Default Programs**

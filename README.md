@@ -208,14 +208,22 @@ type. The authoritative setting lives in
 `HKCU\...\Explorer\FileExts\<ext>\UserChoice`, which carries a hash and a deny
 ACE so that only the shell can write it. Anything claiming to set a default
 association silently is either forging that hash or not actually working.
-`Install-GcsViewer.ps1` does everything a program legitimately can — the
-ProgId and its document icon, the `Applications` entry, `SupportedTypes`, the
-Open-With MRU, a Start Menu shortcut, and a **Default Programs**
-registration (`RegisteredApplications` plus a `Capabilities` key), all
-per-user and without admin. That last one is what actually puts **GCS
-Viewer** in the picker and in Settings; registering the handler alone is not
-enough on Windows 11, which is why an app can be correctly associated and
-still be missing from the list of things to choose.
+`Install-GcsViewer.ps1` does everything a program legitimately can, all
+per-user and without admin. That turns out to be **three separate
+registrations**, and Windows uses a different one for each place it might
+offer you the app:
+
+| Registration | Without it |
+|---|---|
+| The handler — ProgId, `shell\open\command`, `DefaultIcon`, `Applications\<exe>` with `SupportedTypes`, Open-With MRU | Nothing can open the file at all |
+| **Default Programs** — `RegisteredApplications` + a `Capabilities` key | Missing from Explorer's *"Select an app to open this file"* dialog |
+| **`ProgId\Application`** — `ApplicationName`, icon, description | Missing from **Settings → Apps → Default apps**, because that page lists ProgIds and names them from this subkey |
+
+Get the first and you are correctly associated. Miss either of the others and
+the app is correctly associated *and unofferable* — which is a confusing place
+to be, because every registry check you would think to run comes back right.
+`scripts/Show-OpenWithList.ps1` asks the shell directly rather than inferring
+it.
 
 [`INSTALL.md`](INSTALL.md) is the version to hand to somebody else.
 

@@ -5,9 +5,12 @@ dist/
 __pycache__/
 *.py[cod]
 
-# the live executable the .gcs association points at - 30 MB, rebuilt from
-# source by scripts/build_exe.py and published on the releases page
+# the live executable the .gcs association points at - rebuilt from source by
+# scripts/build_exe.py and published on the releases page.  /GCSViewer/ is the
+# installed folder build, ~70 MB across 1,043 files; /GCSViewer.exe is the
+# single-file shape, kept only if that is what is installed
 /GCSViewer.exe
+/GCSViewer/
 
 # personal notes, the superseded C# launcher, and the archived 2026-06-10 exe
 local/
