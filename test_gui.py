@@ -223,41 +223,55 @@ def main():
                 app.root.event_generate(seq, when="now")
                 pump(app)
 
-            key("<Right>")
-            moved = app.path != here
-            check("keys: Right is bound to stepping forward", moved,
-                  os.path.basename(app.path))
-            if moved:
-                key("<Left>")
-                check("keys: Left steps back to where it was",
-                      app.path == here, os.path.basename(app.path))
+            # Whether synthetic key events reach a binding depends on the
+            # window manager and on the window having focus, neither of which
+            # is guaranteed on a build agent.  Probe it with a key of our own
+            # first: if dispatch does not work here, say so once rather than
+            # reporting seven failures that mean nothing about the program.
+            fired = []
+            app.root.bind("<F9>", lambda e: fired.append(1))
+            key("<F9>")
+            app.root.unbind("<F9>")
+            dispatch = bool(fired)
+            if not dispatch:
+                print("  ..   key dispatch unavailable here; key checks skipped")
 
-            before_gray = app.gray
-            key("g")
-            check("keys: g toggles grayscale", app.gray != before_gray,
-                  app.gray)
-            key("g")
+            if dispatch:
+                key("<Right>")
+                moved = app.path != here
+                check("keys: Right is bound to stepping forward", moved,
+                      os.path.basename(app.path))
+                if moved:
+                    key("<Left>")
+                    check("keys: Left steps back to where it was",
+                          app.path == here, os.path.basename(app.path))
 
-            before_labels = app.labels
-            key("l")
-            check("keys: l toggles the tier labels",
-                  app.labels != before_labels, app.labels)
-            key("l")
+                before_gray = app.gray
+                key("g")
+                check("keys: g toggles grayscale", app.gray != before_gray,
+                      app.gray)
+                key("g")
 
-            before_instr = app.show_instr
-            key("i")
-            check("keys: i toggles the instructions table",
-                  app.show_instr != before_instr, app.show_instr)
-            key("i")
+                before_labels = app.labels
+                key("l")
+                check("keys: l toggles the tier labels",
+                      app.labels != before_labels, app.labels)
+                key("l")
 
-            app.az = 111.0
-            key("r")
-            check("keys: r resets the 3/4 angle", app.az == 35.0, app.az)
+                before_instr = app.show_instr
+                key("i")
+                check("keys: i toggles the instructions table",
+                      app.show_instr != before_instr, app.show_instr)
+                key("i")
 
-            el_before = app.el
-            key("<Up>")
-            check("keys: Up tilts the view", app.el != el_before, app.el)
-            key("<Down>")
+                app.az = 111.0
+                key("r")
+                check("keys: r resets the 3/4 angle", app.az == 35.0, app.az)
+
+                el_before = app.el
+                key("<Up>")
+                check("keys: Up tilts the view", app.el != el_before, app.el)
+                key("<Down>")
             app.root.withdraw()
 
             # -- saving --
