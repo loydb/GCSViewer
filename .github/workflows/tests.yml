@@ -44,10 +44,13 @@ jobs:
         if: matrix.python == '3.12'
         run: python scripts/mutation_check.py
 
-      # The committed demo is the README's illustration; regenerating it here
-      # proves the generator still matches what is checked in.
-      - name: Rebuild the demo stone
+      # The committed demo and icon are both drawn by the renderer under test,
+      # so regenerating them here proves the generators still run against the
+      # current source rather than quietly rotting next to what is checked in.
+      - name: Rebuild the demo stone and the icon
         if: matrix.python == '3.12'
         env:
           GCS_VIEWER_NO_GUI: "1"
-        run: python scripts/make_demo.py
+        run: |
+          python scripts/make_demo.py
+          python scripts/gen_icon.py
