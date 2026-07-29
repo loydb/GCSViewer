@@ -63,12 +63,15 @@ jobs:
           python scripts/make_demo.py
           python scripts/gen_icon.py
 
-      # The .gcs is pure geometry - no fonts, no image encoder - so it is
-      # reproducible anywhere and can be compared byte for byte against what
-      # is committed.  If the generator and the checked-in stone ever part
-      # company, the README is illustrating something the program no longer
-      # produces.  The .png and .ico are deliberately not compared: they
-      # depend on the fonts and Pillow build present on the machine.
+      # If the generator and the checked-in stone ever part company, the
+      # README illustrates something the program no longer produces.
+      # Compared as geometry rather than as bytes: a .gcs stores full
+      # precision reprs of sin/cos/tan results, and those differ in the last
+      # bit between the Windows CRT and glibc, so a byte comparison fails on
+      # a different platform for reasons that have nothing to do with this
+      # program.  It did exactly that here before this was written.
       - name: The committed demo stone still matches its generator
         if: matrix.python == '3.12'
-        run: git diff --exit-code -- docs/demo.gcs
+        env:
+          GCS_VIEWER_NO_GUI: "1"
+        run: python scripts/check_demo.py
