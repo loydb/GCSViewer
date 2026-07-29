@@ -716,6 +716,34 @@ def render_instructions(rows, width=1412, gray=False):
     return img
 
 
+_INSTR_CACHE = []          # [(key, image)], most recent last
+
+
+def render_instructions_cached(rows, width, gray=False, keep=4):
+    """render_instructions, memoised on what it draws.
+
+    The table is redrawn on every frame of a drag even though nothing in it
+    changes - it costs about 40% of a frame on an ordinary stone, and two
+    thirds of one on the heaviest design in the reference collection (4,200
+    facets, hundreds of tier rows, 167 ms of a 249 ms frame).  Keying on the
+    row contents rather than on the file means a redundant redraw is caught
+    however the caller arrived at it.
+
+    A handful of entries are kept, so arrowing back and forth between two
+    designs stays warm without the cache growing with the folder.
+    """
+    key = (int(width), bool(gray),
+           tuple((r["name"], round(float(r["angle"]), 6), r["section"],
+                  r["index"], r["instr"]) for r in rows))
+    for k, img in _INSTR_CACHE:
+        if k == key:
+            return img
+    img = render_instructions(rows, width=width, gray=gray)
+    _INSTR_CACHE.append((key, img))
+    del _INSTR_CACHE[:-keep]
+    return img
+
+
 def compose(panels, info, src_name, panel, instr_img=None,
             pad=16, header=54, footer=30):
     n = len(panels)
@@ -887,8 +915,8 @@ class ViewerApp:
         instr_img = None
         if getattr(self, "show_instr", True):
             rows = tier_table(self.facets, gear=self.info.get("gear", 96.0))
-            instr_img = render_instructions(rows, width=self.panel * 3 + 32,
-                                            gray=self.gray)
+            instr_img = render_instructions_cached(rows, self.panel * 3 + 32,
+                                                   gray=self.gray)
         canvas = compose([self.p_top, self.p_side, self.p_34],
                          self.info, self.path, self.panel, instr_img=instr_img)
         self._canvas = canvas

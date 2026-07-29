@@ -841,6 +841,48 @@ def test_compose():
           empty.size[0] == 400)
 
 
+def test_instruction_cache():
+    """The table is identical on every frame of a drag, and redrawing it is
+    40% of a frame on an ordinary stone - two thirds of one on a 4,200-facet
+    design.  The cache keys on what would be drawn, not on the file."""
+    del gv._INSTR_CACHE[:]
+    rows = gv.tier_table(synthetic_stone(), gear=96)
+    a = gv.render_instructions_cached(rows, 800)
+    b = gv.render_instructions_cached(gv.tier_table(synthetic_stone(), gear=96),
+                                      800)
+    check("cache: an identical table is not redrawn", a is b)
+
+    c = gv.render_instructions_cached(rows, 900)
+    check("cache: a different width is a different image", c is not a)
+    d = gv.render_instructions_cached(rows, 800, gray=True)
+    check("cache: grayscale is a different image", d is not a)
+
+    changed = [dict(r) for r in rows]
+    changed[0]["instr"] = "Something else entirely"
+    e = gv.render_instructions_cached(changed, 800)
+    check("cache: changed instructions redraw", e is not a)
+    changed2 = [dict(r) for r in rows]
+    changed2[0]["angle"] = rows[0]["angle"] + 0.01
+    check("cache: a changed angle redraws",
+          gv.render_instructions_cached(changed2, 800) is not a)
+
+    check("cache: stays bounded", len(gv._INSTR_CACHE) <= 4,
+          len(gv._INSTR_CACHE))
+    for i in range(10):
+        r2 = [dict(x) for x in rows]
+        r2[0]["name"] = "T%d" % i
+        gv.render_instructions_cached(r2, 800)
+    check("cache: still bounded after ten different tables",
+          len(gv._INSTR_CACHE) <= 4, len(gv._INSTR_CACHE))
+
+    # what it returns must be what render_instructions would have drawn
+    fresh = gv.render_instructions(rows, width=800)
+    cached = gv.render_instructions_cached(rows, 800)
+    check("cache: returns the same picture as drawing it directly",
+          int(np.abs(np.asarray(fresh).astype(int) -
+                     np.asarray(cached).astype(int)).max()) == 0)
+
+
 def test_save_cli(tmp):
     """The --save path is what the exe runs headless, and what CI can check."""
     src = os.path.join(tmp, "synthetic.gcs")
@@ -923,6 +965,7 @@ def main():
         test_depth_order_and_culling()
         test_footer()
         test_compose()
+        test_instruction_cache()
         test_save_cli(tmp)
         test_selftest(tmp)
 

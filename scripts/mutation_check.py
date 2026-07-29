@@ -23,6 +23,9 @@ import tempfile
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 MUTATIONS = [
+    ("let the instruction-table cache return a stale image",
+     "    for k, img in _INSTR_CACHE:\n        if k == key:",
+     "    for k, img in _INSTR_CACHE:\n        if True:"),
     ("put a copyright line back on the sheet",
      'parts = [(info or {}).get("shape", ""), (info or {}).get("date", "")]',
      'parts = ["Copyright 2026", (info or {}).get("shape", "")]'),

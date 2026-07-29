@@ -53,6 +53,12 @@ is cut girdle-first and has no crown yet, so seen from directly above there is
 genuinely nothing to draw — four designs in the reference collection are
 exactly that, and a black square reads as a broken viewer.
 
+Dragging redraws only the 3/4 panel, at reduced sampling while the mouse is
+down, and the cutting table is memoised on its own contents — it does not
+change while you spin the stone, and redrawing it was 40% of a frame on an
+ordinary design and two thirds of one on the heaviest in the collection
+(4,200 facets: 242 ms a frame, now 76 ms).
+
 Rendering is a painter's algorithm with back-face culling, one fixed light
 and a specular highlight — deliberately flat and matte. It is a drawing of the
 geometry, not a simulation of the stone: no refraction, no dispersion, no
@@ -197,7 +203,7 @@ background, leaving a crown floating with no stone under it.
 ## Tests
 
 ```bash
-python test_gcs_viewer.py     # 132 checks
+python test_gcs_viewer.py     # 140 checks
 ```
 
 No fixtures on disk and no third-party design files: every stone is
@@ -219,9 +225,9 @@ That is not a guess. Run:
 python scripts/mutation_check.py
 ```
 
-It reintroduces fourteen deliberate defects one at a time — dropping the `.gem`
+It reintroduces fifteen deliberate defects one at a time — dropping the `.gem`
 Y mirror, painting nearest-first, ignoring the gear, losing the instruction
-text — and reports which checks catch each one. Currently **14 of 14**. The
+text — and reports which checks catch each one. Currently **15 of 15**. The
 first run of this harness found three that survived, which is how the culling
 and paint-order scenes came to exist.
 
