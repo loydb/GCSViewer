@@ -5,6 +5,16 @@ Every release is built, self-tested and published by
 publish a tag that disagrees with `__version__` and refuses to ship an
 executable whose frozen code does not match the committed source.
 
+## 1.0.23
+
+- **The install guide told you to extract both downloads the same way, and
+  they unpack differently.** The single-file zip puts its files at the root;
+  the folder zip contains a `GCSViewer` folder. Following the old
+  instruction with the folder download gave `GCSViewer\GCSViewer\`. Now
+  documented per download, with a note that the installer registers whichever
+  `GCSViewer.exe` sits beside it — so step 2 must be the folder holding the
+  `.exe`, not its parent.
+
 ## 1.0.22
 
 - **The installer now notices when the program has moved** and says which file

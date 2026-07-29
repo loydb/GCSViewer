@@ -53,11 +53,23 @@ current user only.
 
 ## Install the viewer
 
-1. **Extract** this zip to a permanent location — for example
-   `C:\Tools\GCSViewer\`. The viewer runs from wherever you put it, so don't
-   delete the folder afterward.
+1. **Extract** this zip to a permanent location. The viewer runs from
+   wherever you put it, so don't delete the folder afterward.
+
+   The two downloads unpack differently, so extract them to different places:
+
+   | Download | Extract to | You end up with |
+   |---|---|---|
+   | `GCSViewer-<version>-windows.zip` | the folder you want it in, e.g. `C:\Tools\GCSViewer` | files directly in that folder |
+   | `GCSViewer-<version>-windows-folder.zip` | the **parent**, e.g. `C:\Tools` | `C:\Tools\GCSViewer\` |
+
+   The folder download already contains a `GCSViewer` folder. Extracting it
+   *into* one called `GCSViewer` gives you `GCSViewer\GCSViewer\`, which works
+   but reads badly and makes the path you have to type twice as long.
+
 2. Open **PowerShell** and change into the folder that contains
-   `GCSViewer.exe`, e.g.:
+   `GCSViewer.exe` — the installer registers whichever copy sits beside it,
+   so this must be the folder holding the `.exe`, not its parent:
 
    ```powershell
    cd C:\Tools\GCSViewer
