@@ -1,0 +1,30 @@
+# PyInstaller output
+build/
+dist/
+*.spec
+__pycache__/
+*.py[cod]
+
+# the live executable the .gcs association points at - 30 MB, rebuilt from
+# source by scripts/build_exe.py and published on the releases page
+/GCSViewer.exe
+
+# personal notes, the superseded C# launcher, and the archived 2026-06-10 exe
+local/
+
+# design files and renders - the only ones the repo carries are its own demo
+*.gcs
+*.gem
+*.png
+!docs/demo.gcs
+!docs/demo.png
+*_views.png
+
+# packaged distribution
+*.zip
+
+# editors / OS
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini

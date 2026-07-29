@@ -1,0 +1,137 @@
+name: release
+
+# Builds the exe and the ready-to-hand-out zip on a version tag and attaches
+# both to the release, so cutting a release does not depend on one particular
+# machine having PyInstaller.  workflow_dispatch runs everything except the
+# upload, which makes the build verifiable without minting a throwaway tag.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+
+      # Never ship a binary that has not passed its own suite.
+      - name: Run tests
+        env:
+          GCS_VIEWER_NO_GUI: "1"
+        run: python test_gcs_viewer.py
+
+      - name: Build single-file exe
+        run: python scripts/build_exe.py --no-install
+
+      # A --windowed exe detaches from the console, so its exit code has to be
+      # collected through Start-Process -Wait.  The self-test proves the frozen
+      # bundle can parse, shade and write a PNG: a PyInstaller build can look
+      # healthy and still be missing Pillow's encoder or its font handling.
+      - name: Self-test the exe
+        run: |
+          $p = Start-Process .\dist\GCSViewer.exe -ArgumentList "--selftest","selftest.txt" -PassThru -Wait
+          Get-Content selftest.txt
+          if ($p.ExitCode -ne 0) { throw "self-test failed ($($p.ExitCode))" }
+
+      # The frozen code is the entry script as a marshalled code object.  This
+      # compares it function by function against the source in this commit, so
+      # a release can never ship the stale-exe failure this project already had
+      # once: a binary four weeks behind the .py it was supposedly built from.
+      - name: Verify the exe matches this commit's source
+        run: |
+          python scripts/compare_exe_source.py dist/GCSViewer.exe gcs_viewer.py | Tee-Object -Variable out
+          if ($out -notmatch "IDENTICAL") { throw "the built exe does not match gcs_viewer.py" }
+
+      - name: Package the installable zip
+        id: package
+        run: |
+          $v = "${{ github.ref_name }}" -replace '^v',''
+          if (-not $v -or "${{ github.ref_type }}" -ne "tag") { $v = "dev" }
+          New-Item -ItemType Directory -Force pkg | Out-Null
+          Copy-Item dist/GCSViewer.exe, Install-GcsViewer.ps1, Uninstall-GcsViewer.ps1, INSTALL.md pkg/
+          $zip = "GCSViewer-$v-windows.zip"
+          Compress-Archive -Path pkg/* -DestinationPath $zip -CompressionLevel Optimal
+          $n = [IO.Compression.ZipFile]::OpenRead((Resolve-Path $zip)).Entries.Count
+          if ($n -ne 4) { throw "zip has $n entries, expected 4" }
+          "zip=$zip" >> $env:GITHUB_OUTPUT
+
+      - name: Checksums
+        id: sums
+        run: |
+          $a = (Get-FileHash dist/GCSViewer.exe -Algorithm SHA256).Hash.ToLower()
+          $b = (Get-FileHash "${{ steps.package.outputs.zip }}" -Algorithm SHA256).Hash.ToLower()
+          "exe=$a" >> $env:GITHUB_OUTPUT
+          "zip=$b" >> $env:GITHUB_OUTPUT
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: GCSViewer-${{ github.ref_name }}
+          path: |
+            dist/GCSViewer.exe
+            ${{ steps.package.outputs.zip }}
+
+      # Pushing a tag creates a tag, not a Release, so `gh release upload` has
+      # nothing to attach to on a first publish.  Create it when absent, then
+      # upload either way, so this works for a fresh tag and for a re-run.
+      - name: Attach to release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "${{ github.ref_name }}"
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag --title "GCS Viewer $tag" --notes-from-tag
+            if ($LASTEXITCODE -ne 0) { throw "could not create release $tag" }
+          }
+          gh release upload $tag dist/GCSViewer.exe "${{ steps.package.outputs.zip }}" --clobber
+          if ($LASTEXITCODE -ne 0) { throw "asset upload failed" }
+
+      # Hashes are computed from the artifacts that were actually uploaded, so
+      # the published checksums always describe the published files.  The
+      # existing block is stripped first, so re-running is idempotent.
+      - name: Publish checksums into the release notes
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $zipName = "${{ steps.package.outputs.zip }}"
+          $body = gh release view $tag --json body --jq .body
+          if ($LASTEXITCODE -ne 0) { throw "could not read release notes" }
+          $marker = "## Checksums"
+          $i = $body.IndexOf($marker)
+          if ($i -ge 0) { $body = $body.Substring(0, $i).TrimEnd() }
+          # built line by line rather than with a here-string: PowerShell wants
+          # the terminator at column 0, which a YAML block scalar cannot express
+          $fence = ([string][char]0x60) * 3
+          $run = "https://github.com/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
+          $block = @(
+            ""
+            ""
+            $marker
+            ""
+            $fence
+            "sha256  ${{ steps.sums.outputs.exe }}  GCSViewer.exe"
+            "sha256  ${{ steps.sums.outputs.zip }}  $zipName"
+            $fence
+            ""
+            "Built and published by [this workflow run]($run)."
+          ) -join "`n"
+          Set-Content -Path notes.md -Value ($body + $block) -Encoding utf8
+          gh release edit $tag --notes-file notes.md
