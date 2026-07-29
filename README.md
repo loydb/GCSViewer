@@ -208,11 +208,16 @@ three changes it was missing.
 ```bash
 python scripts/make_demo.py
 python scripts/gen_icon.py
+python scripts/check_demo.py
 ```
 
 `make_demo.py` regenerates `docs/demo.gcs` and `docs/demo.png`.
 `gen_icon.py` regenerates `docs/gcsviewer.ico`, which `build_exe.py` compiles
 into the executable and the installer points `.gcs` and `.gem` documents at.
+`check_demo.py` asserts the committed stone still matches its generator — as
+geometry, not as bytes, because a `.gcs` holds full-precision reprs of
+`sin`/`cos`/`tan` results and those differ in the last bit between the Windows
+CRT and glibc.
 
 ![the icon at 16, 24, 32, 48, 64, 128 and 256 pixels](docs/icon-preview.png)
 
