@@ -814,6 +814,31 @@ def test_footer():
           gv._footer_text({"ri_min": "1.54"}) == "",
           gv._footer_text({"ri_min": "1.54"}))
 
+    # a .gem carries the designer's own notes and none of the rest; they were
+    # parsed out of the file and then never displayed anywhere
+    note = "Designed by Bob Keller / Suitable for larger stones"
+    check("footer: the designer's notes are shown",
+          gv._footer_text({"notes": note}) == note,
+          gv._footer_text({"notes": note}))
+    check("footer: notes come after what else the file states",
+          gv._footer_text({"shape": "Round", "notes": note})
+          .startswith("Round"),
+          gv._footer_text({"shape": "Round", "notes": note}))
+
+    # long notes have to be trimmed to the sheet, and the trimming is
+    # memoised because the footer is redrawn on every frame of a drag
+    font = gv._load_font(15)
+    long_note = "x" * 4000
+    fitted = gv._fit_text(font, long_note, 600)
+    check("footer: a long note is trimmed to fit",
+          font.getlength(fitted) <= 600, font.getlength(fitted))
+    check("footer: and says it was trimmed", fitted.endswith("…"), fitted[-8:])
+    check("footer: trimming is memoised",
+          gv._fit_text(font, long_note, 600) is fitted)
+    short = "Round"
+    check("footer: text that already fits is untouched",
+          gv._fit_text(font, short, 600) == short)
+
 
 def test_compose():
     facets = synthetic_stone()

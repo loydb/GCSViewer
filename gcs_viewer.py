@@ -37,7 +37,7 @@ from PIL import Image, ImageDraw, ImageFont
 # that disagrees with this.  A viewer handed out as a bare .exe has no other
 # way to answer "which build is this?" - and this project has already shipped
 # a binary four weeks behind its own source once.
-__version__ = "1.0.10"
+__version__ = "1.0.11"
 
 # ----------------------------------------------------------------------------
 # Parsing
@@ -564,12 +564,48 @@ def _footer_text(info):
     a rendered sheet belongs to whoever cut or designed the stone - so it
     puts nothing of its own on the page.  A file that states none of these
     gets no footer at all rather than an empty rule.
+
+    The notes come last and are usually the whole line, because a .gem is
+    where they come from and a .gem states none of the rest.  They were being
+    read out of the file and then thrown away: the designer's own account of
+    the stone - what it is for, what material suits it, where the rest of
+    their work lives - parsed and never shown.
     """
-    parts = [(info or {}).get("shape", ""), (info or {}).get("date", "")]
-    ri_min, ri_max = (info or {}).get("ri_min"), (info or {}).get("ri_max")
+    info = info or {}
+    parts = [info.get("shape", ""), info.get("date", "")]
+    ri_min, ri_max = info.get("ri_min"), info.get("ri_max")
     if ri_min and ri_max:
         parts.append("RI %s-%s" % (ri_min, ri_max))
+    notes = (info.get("notes") or "").strip()
+    if notes:
+        parts.append(notes)
     return "   |   ".join(str(p) for p in parts if p)
+
+
+_FIT_CACHE = {}
+
+
+def _fit_text(font, text, maxw, keep=8):
+    """Trim `text` until it fits `maxw`, with an ellipsis if anything went.
+
+    Memoised: the footer is redrawn on every frame of a drag, and a .gem note
+    block runs to a few hundred characters, so the trimming loop would run
+    per frame on exactly the files that need it.
+    """
+    key = (id(font), text, int(maxw))
+    hit = _FIT_CACHE.get(key)
+    if hit is not None:
+        return hit
+    out = text
+    if font.getlength(out) > maxw:
+        while out and font.getlength(out + "…") > maxw:
+            out = out[:-1]
+        out = out.rstrip(" ,;/-") + "…"
+    _FIT_CACHE[key] = out
+    if len(_FIT_CACHE) > keep:
+        for k in list(_FIT_CACHE)[:-keep]:
+            del _FIT_CACHE[k]
+    return out
 
 
 def make_panels(facets, scale, color, angles34, size, ss, gray, labels):
@@ -787,8 +823,8 @@ def compose(panels, info, src_name, panel, instr_img=None,
 
     text = _footer_text(info)
     if text:
-        d.text((pad, H - footer + 4), text, fill=(165, 165, 170),
-               font=small_font)
+        d.text((pad, H - footer + 4), _fit_text(small_font, text, W - 2 * pad),
+               fill=(165, 165, 170), font=small_font)
     return canvas
 
 

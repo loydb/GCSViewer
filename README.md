@@ -82,7 +82,8 @@ The `.gem` reader works out the layout as it goes: records of
 `[int32 flag][7-bit-length "tier<TAB>instruction"]` followed by float64
 vertex groups, coordinates that are the `.gcs` ones with Y mirrored, and a
 trailing block of .NET length-prefixed strings holding the title and the
-designer's notes. Face normals are recomputed with Newell's method and
+designer's notes — which the sheet prints along its foot, trimmed to fit,
+because that is often the only thing a `.gem` says about itself. Face normals are recomputed with Newell's method and
 oriented outward, because the stored ones cannot be relied on.
 
 There is no `.asc` support, by design.
@@ -222,7 +223,7 @@ background, leaving a crown floating with no stone under it.
 ## Tests
 
 ```bash
-python test_gcs_viewer.py     # 154 checks
+python test_gcs_viewer.py     # 161 checks
 ```
 
 No fixtures on disk and no third-party design files: every stone is
@@ -244,9 +245,9 @@ That is not a guess. Run:
 python scripts/mutation_check.py
 ```
 
-It reintroduces seventeen deliberate defects one at a time — dropping the `.gem`
+It reintroduces eighteen deliberate defects one at a time — dropping the `.gem`
 Y mirror, painting nearest-first, ignoring the gear, losing the instruction
-text — and reports which checks catch each one. Currently **17 of 17**. The
+text — and reports which checks catch each one. Currently **18 of 18**. The
 first run of this harness found three that survived, which is how the culling
 and paint-order scenes came to exist.
 
