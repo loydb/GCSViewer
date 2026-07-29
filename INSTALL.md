@@ -232,6 +232,9 @@ that choice in a protected setting the script cannot remove; clear it in
 |---------|-----|
 | Windows SmartScreen: "Windows protected your PC" | Click **More info → Run anyway** (first launch only). |
 | Every launch takes a second or so | Expected of the single-file build — it unpacks itself each time. Use the folder download instead. |
+| Double-click shows **"Select an app to open this file"** even though the default is already set | Explorer caches file associations for the life of its session, and a cached entry outlives the registry. **Sign out and back in, or reboot.** To confirm that is what it is: open PowerShell and run `Start-Process "C:\path	o\stone.gcs"` — if it opens the viewer from there but Explorer still prompts, the registration is correct and only the cache is stale. |
+| **GCSViewer.exe** appears twice in the list | Two registrations legitimately resolve to the same program: the document type (`GcsViewer.Stone`) and the application entry (`Applications\GCSViewer.exe`). Either works. Both exist because the second is what "Choose an app on your PC" attaches to. |
+| A default you set stops working after the program is moved | Windows binds a saved default to the app as it was registered when you picked it. Re-run `Install-GcsViewer.ps1` from the new location and set the default once more — the installer warns you when it detects this. |
 | Double-click opens a different program | Re-set the default with **Open with → Choose another app** (see above). |
 | Not sure which version you have | Look at the title bar, or run `.\GCSViewer.exe --version`. |
 | "The file is empty (0 bytes)" | The file really is empty — nothing to show. Restore it from a backup. |

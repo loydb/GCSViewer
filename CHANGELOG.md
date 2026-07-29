@@ -5,6 +5,17 @@ Every release is built, self-tested and published by
 publish a tag that disagrees with `__version__` and refuses to ship an
 executable whose frozen code does not match the committed source.
 
+## 1.0.25
+
+- Documented the failure this project spent an evening on: Explorer caches
+  file associations for the life of its session, so a correct registration can
+  still produce the "Select an app to open this file" prompt. Includes the
+  test that distinguishes it — the same file launched from PowerShell resolves
+  the registry directly, so if that opens the viewer while Explorer prompts,
+  only the cache is stale.
+- Also documented why the program can appear twice in that list, and that a
+  saved default does not survive the program being moved.
+
 ## 1.0.24
 
 - **The moved-install warning now gives advice that actually works.** It said

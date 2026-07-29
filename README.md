@@ -185,6 +185,13 @@ on a `.gem` file.
 > `Install-GcsViewer.ps1` has not been run from the folder holding that
 > `GCSViewer.exe`.
 
+If double-click still shows the picker after you have set the default, the
+registration is fine and Explorer's association cache is stale — it caches for
+the life of its session and outlives the registry. Sign out, or reboot. The
+test that tells them apart: run `Start-Process "stone.gcs"` from PowerShell,
+which resolves the registry directly. If that opens the viewer while Explorer
+prompts, it is the cache.
+
 Setting the viewer as the default does not remove anything else. Gem Cut
 Studio, or whatever else you have, stays available on both file types through
 **Open with** — it just stops being what a double-click reaches.
