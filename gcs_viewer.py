@@ -789,6 +789,54 @@ def compose(panels, info, src_name, panel, instr_img=None,
 # Interactive window
 # ----------------------------------------------------------------------------
 
+_FOLDER_CACHE = {}         # normcased folder -> (mtime_ns, [paths])
+
+
+def natural_key(p):
+    """Explorer's sort: gem2 before gem10."""
+    name = os.path.basename(p).lower()
+    return [int(t) if t.isdigit() else t for t in re.split(r"(\d+)", name)]
+
+
+def folder_designs(path, keep=8):
+    """Every design file beside `path`, in Explorer's order.
+
+    Called on each arrow press, and twice per press before this was hoisted
+    out of the viewer - once to step the file and once to write the position
+    into the status line.  On a 996-design folder that was 52 ms of stat calls
+    per keystroke, more than the parse and render it was wrapping.
+
+    scandir carries the directory entry's own type, so no separate stat per
+    file is needed, and the result is cached against the directory's
+    modification time - which NTFS bumps when a file is added, removed or
+    renamed, so adding a design while the viewer is open still shows up.
+    """
+    folder = os.path.dirname(path) or "."
+    key = os.path.normcase(folder)
+    try:
+        stamp = os.stat(folder).st_mtime_ns
+    except OSError:
+        return [path]
+
+    hit = _FOLDER_CACHE.get(key)
+    if hit is not None and hit[0] == stamp:
+        return hit[1]
+
+    try:
+        files = [e.path for e in os.scandir(folder)
+                 if e.name.lower().endswith((".gcs", ".gem")) and e.is_file()]
+    except OSError:
+        return [path]
+    files.sort(key=natural_key)
+    files = files or [path]
+
+    _FOLDER_CACHE[key] = (stamp, files)
+    if len(_FOLDER_CACHE) > keep:
+        for k in list(_FOLDER_CACHE)[:-keep]:
+            del _FOLDER_CACHE[k]
+    return files
+
+
 class ViewerApp:
     def __init__(self, path, gray=False, labels=True):
         import tkinter as tk
@@ -853,23 +901,11 @@ class ViewerApp:
         self.color = material["color"]
         self.scale = world_scale(facets)
 
-    @staticmethod
-    def _natural_key(p):
-        name = os.path.basename(p).lower()
-        return [int(t) if t.isdigit() else t for t in re.split(r"(\d+)", name)]
+    _natural_key = staticmethod(natural_key)
 
     def _siblings(self):
-        """All .gcs files in the current folder, Explorer-style sorted."""
-        folder = os.path.dirname(self.path) or "."
-        try:
-            names = os.listdir(folder)
-        except OSError:
-            return [self.path]
-        files = [os.path.join(folder, n) for n in names
-                 if n.lower().endswith((".gcs", ".gem"))
-                 and os.path.isfile(os.path.join(folder, n))]
-        files.sort(key=self._natural_key)
-        return files or [self.path]
+        """All .gcs / .gem files in the current folder, Explorer-sorted."""
+        return folder_designs(self.path)
 
     def _step_file(self, direction):
         files = self._siblings()

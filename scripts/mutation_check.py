@@ -23,6 +23,12 @@ import tempfile
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 MUTATIONS = [
+    ("let the folder listing go stale when a design is added",
+     "    if hit is not None and hit[0] == stamp:",
+     "    if hit is not None:"),
+    ("sort the folder listing lexically instead of naturally",
+     "    files.sort(key=natural_key)",
+     "    files.sort()"),
     ("let the instruction-table cache return a stale image",
      "    for k, img in _INSTR_CACHE:\n        if k == key:",
      "    for k, img in _INSTR_CACHE:\n        if True:"),

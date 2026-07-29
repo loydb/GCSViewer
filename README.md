@@ -99,6 +99,12 @@ There is no `.asc` support, by design.
 Unreadable files are skipped while arrowing through a folder rather than
 stopping the walk.
 
+The folder listing is read with `scandir` and cached against the directory's
+modification time, so holding an arrow key down costs a parse and a render
+rather than a full re-scan — on a 996-design folder that was 52 ms per
+keypress before, more than the work it was wrapping. A design added while the
+viewer is open still appears, because adding one changes that timestamp.
+
 ## Install
 
 `GCSViewer.exe` needs nothing installed — no Python, no numpy, no Pillow. The
@@ -203,7 +209,7 @@ background, leaving a crown floating with no stone under it.
 ## Tests
 
 ```bash
-python test_gcs_viewer.py     # 140 checks
+python test_gcs_viewer.py     # 147 checks
 ```
 
 No fixtures on disk and no third-party design files: every stone is
@@ -225,9 +231,9 @@ That is not a guess. Run:
 python scripts/mutation_check.py
 ```
 
-It reintroduces fifteen deliberate defects one at a time — dropping the `.gem`
+It reintroduces seventeen deliberate defects one at a time — dropping the `.gem`
 Y mirror, painting nearest-first, ignoring the gear, losing the instruction
-text — and reports which checks catch each one. Currently **15 of 15**. The
+text — and reports which checks catch each one. Currently **17 of 17**. The
 first run of this harness found three that survived, which is how the culling
 and paint-order scenes came to exist.
 

@@ -841,6 +841,52 @@ def test_compose():
           empty.size[0] == 400)
 
 
+def test_folder_listing(tmp):
+    """Walking a folder happens on every arrow press, twice, and on a
+    996-design folder the stat calls cost more than the parse and render
+    they were wrapping."""
+    d = os.path.join(tmp, "folder")
+    os.makedirs(d, exist_ok=True)
+    names = ["gem10.gcs", "gem2.gcs", "gem1.gem", "notes.txt", "GEM3.GCS"]
+    for n in names:
+        with open(os.path.join(d, n), "w", encoding="utf-8") as fh:
+            fh.write("x")
+    os.makedirs(os.path.join(d, "sub.gcs"), exist_ok=True)   # a directory
+
+    got = [os.path.basename(p) for p in
+           gv.folder_designs(os.path.join(d, "gem1.gem"))]
+    check("folder: natural sort, so gem2 precedes gem10",
+          got == ["gem1.gem", "gem2.gcs", "GEM3.GCS", "gem10.gcs"], got)
+    check("folder: other file types are ignored", "notes.txt" not in got)
+    check("folder: a directory named like a design is not listed",
+          "sub.gcs" not in got, got)
+
+    again = gv.folder_designs(os.path.join(d, "gem1.gem"))
+    check("folder: an unchanged folder is not re-scanned",
+          again is gv.folder_designs(os.path.join(d, "gem2.gcs")))
+
+    # the cache is keyed on the directory's mtime, which NTFS and POSIX both
+    # bump when a file appears - so a design added while the viewer is open
+    # still shows up
+    import time as _t
+    _t.sleep(0.01)
+    with open(os.path.join(d, "gem4.gcs"), "w", encoding="utf-8") as fh:
+        fh.write("x")
+    fresh = [os.path.basename(p) for p in
+             gv.folder_designs(os.path.join(d, "gem1.gem"))]
+    check("folder: a design added afterwards is picked up",
+          "gem4.gcs" in fresh, fresh)
+
+    empty = os.path.join(tmp, "empty")
+    os.makedirs(empty, exist_ok=True)
+    lone = os.path.join(empty, "nothing.gcs")
+    check("folder: an empty folder falls back to the file itself",
+          gv.folder_designs(lone) == [lone], gv.folder_designs(lone))
+    check("folder: a missing folder does not raise",
+          gv.folder_designs(os.path.join(tmp, "nope", "x.gcs")) ==
+          [os.path.join(tmp, "nope", "x.gcs")])
+
+
 def test_instruction_cache():
     """The table is identical on every frame of a drag, and redrawing it is
     40% of a frame on an ordinary stone - two thirds of one on a 4,200-facet
@@ -965,6 +1011,7 @@ def main():
         test_depth_order_and_culling()
         test_footer()
         test_compose()
+        test_folder_listing(tmp)
         test_instruction_cache()
         test_save_cli(tmp)
         test_selftest(tmp)
