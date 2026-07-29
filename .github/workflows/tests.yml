@@ -61,6 +61,7 @@ jobs:
           GCS_VIEWER_NO_GUI: "1"
         run: |
           python scripts/make_demo.py
+          python scripts/make_demo_anim.py
           python scripts/gen_icon.py
 
       # If the generator and the checked-in stone ever part company, the

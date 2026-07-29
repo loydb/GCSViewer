@@ -9,6 +9,8 @@
 
 # Binary assets - never munge
 *.png    binary
+*.webp   binary
+*.ico    binary
 *.exe    binary
 *.zip    binary
 *.gem    binary
