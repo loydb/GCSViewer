@@ -136,7 +136,10 @@ viewer is open still appears, because adding one changes that timestamp.
 `GCSViewer.exe` needs nothing installed — no Python, no numpy, no Pillow. The
 interpreter and every library are inside the executable.
 
-1. Put it somewhere permanent, e.g. `C:\Tools\GCSViewer\`.
+1. Put it somewhere permanent, e.g. `C:\Tools\GCSViewer\`. If you are running
+   from a clone, the repo root works: `Install-GcsViewer.ps1` registers
+   whichever `GCSViewer.exe` sits beside it, and `build_exe.py` puts one
+   there.
 2. Register it, from that folder:
 
    ```powershell

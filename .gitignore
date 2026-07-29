@@ -5,12 +5,12 @@ dist/
 __pycache__/
 *.py[cod]
 
-# the live executable the .gcs association points at - rebuilt from source by
-# scripts/build_exe.py and published on the releases page.  /GCSViewer/ is the
-# installed folder build, ~70 MB across 1,043 files; /GCSViewer.exe is the
-# single-file shape, kept only if that is what is installed
+# The installed copy lives here at the repo root, which is also what makes
+# this a valid install folder: Install-GcsViewer.ps1 registers whatever
+# GCSViewer.exe sits beside it.  _internal is the folder build's library
+# payload, ~70 MB across 1,043 files.
 /GCSViewer.exe
-/GCSViewer/
+/_internal/
 
 # personal notes, the superseded C# launcher, and the archived 2026-06-10 exe
 local/
