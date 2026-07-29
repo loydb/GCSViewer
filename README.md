@@ -207,9 +207,17 @@ of the subtrees you would think to search. The script prints the `reg delete`
 commands rather than running them; they are your associations, not the
 viewer's.
 
-If you later move the install, Windows discards the default and starts asking
-again; re-run `Install-GcsViewer.ps1` from the new location and repeat this
-section.
+If you later move the install, re-run `Install-GcsViewer.ps1` from the new
+location — it remembers where it last registered and will say so, naming the
+file types affected.
+
+Only a default you **explicitly set** breaks. Windows ties a saved choice to
+the app registration as it stood when you picked it, so after a move a
+double-click on that type does nothing at all: no fallback, no prompt. A type
+you never set follows the move by itself, resolving through the registration
+the installer rewrites. Neither can be repaired programmatically — writing and
+deleting that value are both blocked — so it is one manual pick per affected
+type.
 
 ## Why the default has to be set by hand
 

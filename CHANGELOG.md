@@ -5,6 +5,17 @@ Every release is built, self-tested and published by
 publish a tag that disagrees with `__version__` and refuses to ship an
 executable whose frozen code does not match the committed source.
 
+## 1.0.22
+
+- **The installer now notices when the program has moved** and says which file
+  types it broke. Windows ties a default you explicitly picked to the app
+  registration as it stood at the time, so moving the install silently kills
+  it — a double-click then does nothing at all, with no fallback and no
+  prompt. A type you never explicitly set is unaffected: it resolves through
+  the registration the installer rewrites, and follows the move by itself.
+  The installer records where it registered, so the next run can tell the two
+  apart instead of leaving you to find out by double-clicking.
+
 ## 1.0.21
 
 - **The executable now describes itself.** It carried no Windows version

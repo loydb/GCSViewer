@@ -173,11 +173,17 @@ folder build, replace the whole folder. The file association points at that
 path, so no re-install is needed as long as the name and location stay the
 same.
 
-**If you move it**, re-run `Install-GcsViewer.ps1` from the new location — and
-expect Windows to ask which program to use the next time you double-click a
-design. Changing the path invalidates the default you picked, so you set it
-once more, exactly as in step 4. Moving between the single-file and folder
-downloads counts as moving it.
+**If you move it**, re-run `Install-GcsViewer.ps1` from the new location. The
+installer remembers where it last registered, so it will tell you if the copy
+moved and which file types are affected.
+
+Moving breaks a default you **explicitly set**, and only that. Windows ties a
+saved choice to the app registration as it stood when you picked it, so after
+a move a double-click on that type does nothing at all — it does not fall back
+and it does not prompt. Set it once more, exactly as in step 4. A file type
+you never explicitly set follows the move on its own, because it resolves
+through the registration the installer rewrites. Moving between the
+single-file and folder downloads counts as moving it.
 
 To check what you are running, look at the window's title bar, or run
 `.\GCSViewer.exe --version`.

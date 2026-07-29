@@ -99,6 +99,37 @@ $sc.Save()
 $sig = '[DllImport("shell32.dll")] public static extern void SHChangeNotify(int id, int flags, IntPtr a, IntPtr b);'
 (Add-Type -MemberDefinition $sig -Name Shell -Namespace Win32 -PassThru)::SHChangeNotify(0x08000000,0,[IntPtr]::Zero,[IntPtr]::Zero)
 
+# Did the install move since last time?  Windows validates a saved default
+# against the app registration as it stood when the user picked it, so moving
+# the program invalidates it - and then a double-click does nothing at all
+# rather than falling back or prompting.  An extension with no saved default
+# is unaffected: it falls through to the class default, which is rewritten
+# above and follows the move.  Remember where we registered, so the next run
+# can say which case the user is in instead of leaving them to find out.
+$prev = (Get-ItemProperty "$capRoot" -Name "InstallPath" -ErrorAction SilentlyContinue).InstallPath
+Set-ItemProperty "$capRoot" "InstallPath" $launcher
+
+$broken = @()
+foreach ($ext in @('.gcs', '.gem')) {
+    $uc = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\$ext\UserChoice"
+    $pid_ = (Get-ItemProperty $uc -Name ProgId -ErrorAction SilentlyContinue).ProgId
+    if ($pid_ -and $prev -and $prev -ne $launcher -and
+        ($pid_ -eq $progId -or $pid_ -eq "Applications\$appKey")) {
+        $broken += $ext
+    }
+}
+
+if ($broken) {
+    Write-Host ""
+    Write-Host "NOTE: this copy moved since it was last registered:" -ForegroundColor Yellow
+    Write-Host "        was  $prev"
+    Write-Host "        now  $launcher"
+    Write-Host "      Windows ties a saved default to where the program was when you"
+    Write-Host "      picked it, so the default for $($broken -join ' and ') is now stale and"
+    Write-Host "      double-clicking one will do nothing. Set it again (below) - once."
+    Write-Host "      Anything you never explicitly set has followed the move already."
+}
+
 Write-Host ""
 Write-Host "Registered. Windows does not allow a program to make itself the" -ForegroundColor Green
 Write-Host "default for a file type, so finish it by hand - once for .gcs and" -ForegroundColor Green
