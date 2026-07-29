@@ -8,7 +8,7 @@ Shows three flat-shaded renders of the stone, tinted with the material
 colour stored in the file:
   - "Table (top)" : looking straight down the optic axis at the table
   - "Side"        : the girdle profile
-  - "3/4 view"    : an angled view you can spin by dragging with the mouse
+  - "3/4 view"    : drag to turn it left and right, arrow keys to tip it
 
 Left/Right arrows step through the other .gcs files in the same folder
 (wrapping around), like the Windows photo viewer.
