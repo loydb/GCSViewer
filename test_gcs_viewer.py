@@ -431,6 +431,40 @@ def test_tier_table():
           {r["name"]: r for r in r0}["P1"]["index"] == "00-12-24-36-48-60-72-84")
 
 
+def test_tier_table_multi_instruction():
+    """A .gem puts the instruction on the facet that begins a cutting step,
+    and one tier can hold several steps - so the table has to collect them,
+    not read the first facet and stop.  Across the reference collection that
+    was 144 dropped lines in 56 of 245 .gem files."""
+    facets = synthetic_stone()
+    pav = [f for f in facets if f["tier"] == "P1"]
+    pav[0]["instr"] = "Cut to a center point"
+    for f in pav[1:]:
+        f["instr"] = ""                       # the shape a .gem actually has
+    pav[4]["instr"] = "Meet 1.g1.1"           # a second step in the same tier
+
+    by = {r["name"]: r for r in gv.tier_table(facets, gear=96)}
+    check("tiers: both steps in one tier are kept",
+          by["P1"]["instr"] == "Cut to a center point · Meet 1.g1.1",
+          by["P1"]["instr"])
+    check("tiers: the first step still leads",
+          by["P1"]["instr"].startswith("Cut to a center point"))
+
+    # a .gcs repeats one instruction across every facet of its tier; that must
+    # collapse to a single line rather than being echoed once per facet
+    for f in pav:
+        f["instr"] = "Cut to a center point"
+    by = {r["name"]: r for r in gv.tier_table(facets, gear=96)}
+    check("tiers: a repeated instruction is not duplicated",
+          by["P1"]["instr"] == "Cut to a center point", by["P1"]["instr"])
+
+    for f in pav:
+        f["instr"] = ""
+    by = {r["name"]: r for r in gv.tier_table(facets, gear=96)}
+    check("tiers: a tier with no instruction stays empty",
+          by["P1"]["instr"] == "", repr(by["P1"]["instr"]))
+
+
 # ---------------------------------------------------------------------------
 # 5. Camera
 # ---------------------------------------------------------------------------
@@ -729,6 +763,7 @@ def main():
         test_parse_gem_no_trailing(tmp)
         test_load_design_dispatch(tmp)
         test_tier_table()
+        test_tier_table_multi_instruction()
         test_view_basis()
         test_render()
         test_depth_order_and_culling()

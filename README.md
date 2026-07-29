@@ -214,11 +214,34 @@ That is not a guess. Run:
 python scripts/mutation_check.py
 ```
 
-It reintroduces ten deliberate defects one at a time — dropping the `.gem` Y
-mirror, painting nearest-first, ignoring the gear, losing the instruction
-text — and reports which checks catch each one. Currently **10 of 10**. The
+It reintroduces eleven deliberate defects one at a time — dropping the `.gem`
+Y mirror, painting nearest-first, ignoring the gear, losing the instruction
+text — and reports which checks catch each one. Currently **11 of 11**. The
 first run of this harness found three that survived, which is how the culling
 and paint-order scenes came to exist.
+
+### Against real files
+
+```bash
+python scripts/corpus_scan.py "D:\designs" --render 150 --roundtrip
+```
+
+Synthetic stones prove the format; they cannot prove twenty years of files
+written by other people's programs. This parses every `.gcs` and `.gem` under
+a folder, classifies each one, and appends rows as it goes so an interrupted
+run keeps what it learned.
+
+On the reference collection here — **8,128 files, 7,883 `.gcs` and 245
+`.gem`** — there are **no parse failures and no malformed geometry**. Twelve
+designs contain facets with no area, which is a property of those designs
+rather than a fault in reading them. A 150-design render sample completed
+without a failure.
+
+It also found a real one. In a `.gem` the instruction belongs to the facet
+that *begins* a cutting step, and a tier can hold several steps — Alcyone's
+tier `a` is both "Match g1, establish upper girdle line" and "Meet g1.a.a.g1".
+The table used to read the first facet and stop, dropping **144 instruction
+lines across 56 of the 245 `.gem` files**. It now collects them in order.
 
 ## A note for the solver
 

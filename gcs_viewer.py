@@ -534,9 +534,21 @@ def tier_table(facets, gear=96.0):
             idx_str = "-".join("%02d" % k for k in idxs)
         else:
             idx_str = "Table" if angle < 1.0 else ""
+        # A .gem stores the instruction on the facet that starts a cutting
+        # step, and a tier can contain several steps - "Match g1, establish
+        # upper girdle line" and then "Meet g1.a.a.g1" both live in tier a of
+        # Alcyone.  Taking only the first facet's text dropped 144 lines
+        # across 56 of the 245 .gem files in the collection.  Order is
+        # preserved and repeats collapse, so a .gcs - which repeats one tier
+        # instruction across every facet - is unaffected.
+        instrs = []
+        for f in grp:
+            s = (f.get("instr", "") or "").strip()
+            if s and s not in instrs:
+                instrs.append(s)
         rows.append({"name": str(grp[0].get("tier", "") or ""), "angle": angle,
                      "section": section, "index": idx_str,
-                     "instr": (grp[0].get("instr", "") or "").strip()})
+                     "instr": " · ".join(instrs)})
     return rows
 
 
