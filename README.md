@@ -237,21 +237,32 @@ type. The authoritative setting lives in
 ACE so that only the shell can write it. Anything claiming to set a default
 association silently is either forging that hash or not actually working.
 `Install-GcsViewer.ps1` does everything a program legitimately can, all
-per-user and without admin. That turns out to be **three separate
-registrations**, and Windows uses a different one for each place it might
-offer you the app:
+per-user and without admin: the ProgId with its `shell\open\command` and
+`DefaultIcon`, the `Applications\<exe>` entry with `SupportedTypes`, the
+Open-With MRU, a Start Menu shortcut, and a Default Programs registration
+(`RegisteredApplications` + `Capabilities`).
 
-| Registration | Without it |
-|---|---|
-| The handler — ProgId, `shell\open\command`, `DefaultIcon`, `Applications\<exe>` with `SupportedTypes`, Open-With MRU | Nothing can open the file at all |
-| **Default Programs** — `RegisteredApplications` + a `Capabilities` key | Missing from Explorer's *"Select an app to open this file"* dialog |
-| **`ProgId\Application`** — `ApplicationName`, icon, description | Missing from **Settings → Apps → Default apps**, because that page lists ProgIds and names them from this subkey |
+An honest note on what that does and does not achieve, since this was learned
+the hard way. The handler registration is what makes the file openable, and it
+works. The program appears in Explorer's *"Select an app to open this file"*
+dialog as `GCSViewer.exe`, which comes from the `Applications` entry. The
+Default Programs registration is the documented way to register an
+application, and on the machine this was developed on it did **not** make the
+program appear in Settings → Apps → Default apps. If you know why, a note on
+the issue tracker would be welcome.
 
-Get the first and you are correctly associated. Miss either of the others and
-the app is correctly associated *and unofferable* — which is a confusing place
-to be, because every registry check you would think to run comes back right.
-`scripts/Show-OpenWithList.ps1` asks the shell directly rather than inferring
-it.
+Version 1.0.19 also wrote an `Application` subkey under the ProgId, on the
+theory that Settings needed it. That was wrong twice over: it did not help
+there, and because a ProgId carrying an `Application` subkey declares itself
+an application rather than a document type, it made the program appear
+**twice** in the open-with dialog and stopped Explorer honouring the class
+association it had accepted for weeks — every double-click prompted instead of
+opening. 1.0.26 removes it, and re-running the installer deletes it from a
+machine that ran 1.0.19–1.0.25.
+
+`scripts/Show-OpenWithList.ps1` asks the shell what it would offer, rather
+than inferring it from keys. Reading the registry is what kept this bug alive:
+every key was correct the whole time.
 
 [`INSTALL.md`](INSTALL.md) is the version to hand to somebody else.
 

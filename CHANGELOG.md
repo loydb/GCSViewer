@@ -5,6 +5,21 @@ Every release is built, self-tested and published by
 publish a tag that disagrees with `__version__` and refuses to ship an
 executable whose frozen code does not match the committed source.
 
+## 1.0.26
+
+- **Removed the ProgId `Application` subkey added in 1.0.19, and repaired it on
+  upgrade.** It was written on the theory that Settings → Default apps needed
+  it. It did not help there, and it cost two things: the program appeared
+  **twice** in the open-with dialog (once as the document type pretending to
+  be an app, once as the real `Applications\GCSViewer.exe` entry), and
+  Explorer stopped honouring the class association it had accepted for weeks —
+  prompting on every double-click instead of opening. Re-running the installer
+  now deletes the subkey, so it repairs a machine that ran 1.0.19–1.0.25.
+- Corrected the README's claim that the `Capabilities` registration is what
+  makes the program appear in the picker and in Settings. It appears in the
+  picker via the `Applications` entry, and it did not appear in Settings →
+  Default apps at all.
+
 ## 1.0.25
 
 - Documented the failure this project spent an evening on: Explorer caches

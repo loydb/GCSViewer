@@ -35,18 +35,18 @@ Set-ItemProperty "$classes\$progId\shell\open\command" "(default)" $cmd
 New-Item -Path "$classes\$progId\DefaultIcon" -Force | Out-Null
 Set-ItemProperty "$classes\$progId\DefaultIcon"        "(default)" "`"$launcher`",0"
 
-# Present the ProgId as an *application*, not merely as a document type with
-# a handler.  Settings > Apps > Default apps builds its per-extension list
-# from ProgIds and names each entry from this subkey; a ProgId without one is
-# a file type as far as that page is concerned, and the app never appears in
-# it - correctly registered, correctly associated, and unofferable.
-New-Item -Path "$classes\$progId\Application" -Force | Out-Null
-Set-ItemProperty "$classes\$progId\Application" "ApplicationName"        "GCS Viewer"
-Set-ItemProperty "$classes\$progId\Application" "ApplicationIcon"        "`"$launcher`",0"
-Set-ItemProperty "$classes\$progId\Application" "ApplicationCompany"     "GCS Viewer"
-Set-ItemProperty "$classes\$progId\Application" "ApplicationDescription" `
-    "View Gemcut Studio .gcs and GemCad .gem faceting designs."
-Set-ItemProperty "$classes\$progId"             "FriendlyTypeName"       "Faceting design"
+# REPAIR: versions 1.0.19 to 1.0.25 also wrote an "Application" subkey here,
+# on the theory that it was needed to appear in Settings > Default apps.  It
+# was not - and it appears to have cost more than it bought.  A ProgId with an
+# Application subkey declares itself an *application* rather than a document
+# type, which showed up two ways: the program was listed twice in the
+# open-with dialog (once as this ProgId, once as the real Applications\<exe>
+# entry), and Explorer stopped honouring the class association it had been
+# honouring for weeks, prompting on every double-click instead.  Removed here
+# rather than merely not written, so re-running this repairs a machine that
+# ran one of those versions.
+Remove-Item "$classes\$progId\Application" -Recurse -Force -ErrorAction SilentlyContinue
+Remove-ItemProperty "$classes\$progId" -Name "FriendlyTypeName" -ErrorAction SilentlyContinue
 
 # Named application that appears in the "Open with" list
 New-Item -Path "$classes\Applications\$appKey\shell\open\command" -Force | Out-Null
