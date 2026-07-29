@@ -978,6 +978,41 @@ def test_save_cli(tmp):
     check("cli: a corrupt file exits non-zero instead of raising", bad == 1, bad)
 
 
+def test_version():
+    """A viewer handed out as a bare .exe has no other way to say which build
+    it is, and this project has already shipped one four weeks stale."""
+    import re as _re
+    check("version: looks like a version",
+          bool(_re.fullmatch(r"\d+\.\d+\.\d+", gv.__version__)), gv.__version__)
+    s = gv.version_string()
+    check("version: the string carries it", gv.__version__ in s, s)
+    check("version: says whether it is the exe or the source",
+          "source" in s or "exe" in s, s)
+    check("version: names the Python it is running on",
+          "%d.%d" % sys.version_info[:2] in s, s)
+    check("version: --version exits 0",
+          gv.main(["gcs_viewer.py", "--version"]) == 0)
+    check("version: --version needs no file argument",
+          gv.main(["gcs_viewer.py", "--version"]) == 0)
+
+    # a --windowed build has no stdout at all, and CPython's print() returns
+    # silently rather than raising when sys.stdout is None - so the answer
+    # would simply never appear
+    said = []
+    real_stdout, real_env = sys.stdout, os.environ.get("GCS_VIEWER_NO_GUI")
+    try:
+        sys.stdout = None
+        os.environ["GCS_VIEWER_NO_GUI"] = "1"     # no message box in a test
+        rc = gv.main(["gcs_viewer.py", "--version"])
+    finally:
+        sys.stdout = real_stdout
+        if real_env is None:
+            os.environ.pop("GCS_VIEWER_NO_GUI", None)
+        else:
+            os.environ["GCS_VIEWER_NO_GUI"] = real_env
+    check("version: survives having no console to print to", rc == 0, rc)
+
+
 def test_selftest(tmp):
     """The frozen exe runs exactly this to prove its bundle is complete."""
     report = os.path.join(tmp, "selftest.txt")
@@ -1014,6 +1049,7 @@ def main():
         test_folder_listing(tmp)
         test_instruction_cache()
         test_save_cli(tmp)
+        test_version()
         test_selftest(tmp)
 
     print("\n%d checks passed, %d failed" % (PASS, len(FAIL)))

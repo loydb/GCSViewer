@@ -17,6 +17,7 @@ Usage:
     pythonw gcs_viewer.py "path\\to\\stone.gcs"          # interactive window
     python  gcs_viewer.py "path\\to\\stone.gcs" --save [out.png]
     python  gcs_viewer.py --selftest [report.txt]        # prove a build works
+    python  gcs_viewer.py --version                      # which build is this
     Options: --gray  (grayscale)   --no-labels  (hide tier names)
 
 Set GCS_VIEWER_NO_GUI=1 to make errors print to stderr instead of opening a
@@ -31,6 +32,12 @@ import xml.etree.ElementTree as ET
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
+
+# Bumped with the release tag; the release workflow refuses to publish a tag
+# that disagrees with this.  A viewer handed out as a bare .exe has no other
+# way to answer "which build is this?" - and this project has already shipped
+# a binary four weeks behind its own source once.
+__version__ = "1.0.8"
 
 # ----------------------------------------------------------------------------
 # Parsing
@@ -857,7 +864,8 @@ class ViewerApp:
         self._load_data(path)
 
         self.root = tk.Tk()
-        self.root.title(f"Gem Viewer  -  {os.path.basename(self.path)}")
+        self.root.title(f"Gem Viewer {__version__}  -  "
+                        f"{os.path.basename(self.path)}")
         self.root.configure(bg="#1a1a1e")
         self.label = tk.Label(self.root, bg="#1a1a1e")
         self.label.pack()
@@ -927,7 +935,8 @@ class ViewerApp:
         else:
             self._set_status("No readable .gcs files in this folder")
             return
-        self.root.title(f"Gem Viewer  -  {os.path.basename(self.path)}")
+        self.root.title(f"Gem Viewer {__version__}  -  "
+                        f"{os.path.basename(self.path)}")
         self._render_static()
         self._render_dynamic(self.ss_static)
         self._composite_and_show()
@@ -1039,6 +1048,41 @@ class ViewerApp:
 # Entry point
 # ----------------------------------------------------------------------------
 
+def version_string():
+    """What build this is, and whether it is the frozen one or the source.
+
+    Reported by --version and written into the window title, because the
+    usual way to be wrong about a viewer's behaviour is to be looking at an
+    executable older than the .py you are reading.
+    """
+    kind = "exe" if getattr(sys, "frozen", False) else "source"
+    return "GCS Viewer %s (%s, Python %d.%d.%d)" % (
+        __version__, kind, *sys.version_info[:3])
+
+
+def _tell(text):
+    """Say something to whoever ran the program, wherever they can hear it.
+
+    A --windowed build has no console: CPython's print() sees sys.stdout is
+    None and returns silently, so `GCSViewer.exe --version` double-clicked or
+    run from Explorer would answer nothing at all.  Redirected to a file it
+    prints normally, which is the case CI uses.
+    """
+    if getattr(sys, "stdout", None) is not None:
+        print(text)
+        return
+    if os.environ.get("GCS_VIEWER_NO_GUI"):
+        return
+    try:
+        import tkinter as tk
+        from tkinter import messagebox
+        r = tk.Tk(); r.withdraw()
+        messagebox.showinfo("GCS Viewer", text)
+        r.destroy()
+    except Exception:
+        pass
+
+
 def _error_window(msg):
     # A modal dialog is right for a double-click, and wrong for anything
     # driven by a script: the process would sit forever waiting for an OK
@@ -1143,6 +1187,10 @@ def _selftest(report_path=None):
 def main(argv):
     flags = [a for a in argv[1:] if a.startswith("--")]
     args = [a for a in argv[1:] if not a.startswith("--")]
+
+    if "--version" in flags:
+        _tell(version_string())
+        return 0
 
     if "--selftest" in flags:
         return _selftest(args[0] if args else None)

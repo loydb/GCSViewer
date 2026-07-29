@@ -151,7 +151,14 @@ pythonw gcs_viewer.py "stone.gcs"              # the window
 python  gcs_viewer.py "stone.gcs" --save       # just write stone_views.png
 python  gcs_viewer.py "stone.gcs" --save out.png --gray --no-labels
 python  gcs_viewer.py --selftest report.txt    # prove a build works
+python  gcs_viewer.py --version                # which build is this
 ```
+
+`--version` reports the version, whether it is the frozen executable or the
+source, and the Python underneath — and the version is in the window title
+too. A viewer handed out as a bare `.exe` has no other way to answer that,
+and the release workflow refuses to publish a tag that disagrees with what
+the source says.
 
 numpy, Pillow and tkinter, and nothing else — no matplotlib, no scipy.
 Developed on Python 3.12; CI runs the suite on 3.10, 3.12 and 3.13, on both
@@ -209,7 +216,7 @@ background, leaving a crown floating with no stone under it.
 ## Tests
 
 ```bash
-python test_gcs_viewer.py     # 147 checks
+python test_gcs_viewer.py     # 154 checks
 ```
 
 No fixtures on disk and no third-party design files: every stone is

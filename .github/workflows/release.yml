@@ -34,6 +34,16 @@ jobs:
           GCS_VIEWER_NO_GUI: "1"
         run: python test_gcs_viewer.py
 
+      # A tag that disagrees with __version__ ships a binary that misreports
+      # itself, which is exactly the confusion --version exists to end.
+      - name: Check the tag matches __version__
+        if: github.ref_type == 'tag'
+        run: |
+          $src = python -c "import gcs_viewer; print(gcs_viewer.__version__)"
+          $tag = "${{ github.ref_name }}" -replace '^v',''
+          "source $src, tag $tag"
+          if ($src -ne $tag) { throw "gcs_viewer.__version__ is $src but the tag is $tag" }
+
       - name: Build single-file exe
         run: python scripts/build_exe.py --no-install
 
