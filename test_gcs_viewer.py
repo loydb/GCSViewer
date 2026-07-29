@@ -1012,6 +1012,21 @@ def test_version():
             os.environ["GCS_VIEWER_NO_GUI"] = real_env
     check("version: survives having no console to print to", rc == 0, rc)
 
+    # _attach_console borrows the parent's console on Windows.  Whether one
+    # exists depends on how the process was started, so what is checked here
+    # is that it answers cleanly either way and never raises - it sits on the
+    # path that runs when there is no stdout, where an exception would take
+    # the program down instead of printing a version.
+    saved = sys.stdout
+    try:
+        got = gv._attach_console()
+    except Exception as e:                     # noqa: BLE001
+        got = e
+    finally:
+        sys.stdout = saved
+    check("version: console attachment answers true or false, never raises",
+          isinstance(got, bool), repr(got))
+
 
 def test_selftest(tmp):
     """The frozen exe runs exactly this to prove its bundle is complete."""

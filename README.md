@@ -7,8 +7,13 @@ Look at a faceted gem design without opening the program that cut it.
 
 **[⬇ Download GCSViewer.exe](https://github.com/loydb/GCSViewer/releases/latest/download/GCSViewer.exe)** —
 Windows, nothing to install. Double-click a `.gcs` or `.gem` file and the
-stone is on screen: three shaded views and the cutting instructions,
-in about a second.
+stone is on screen: three shaded views and the cutting instructions.
+
+If you open designs all day, take the **folder build** from the
+[releases page](https://github.com/loydb/GCSViewer/releases/latest) instead.
+The single file unpacks itself into `%TEMP%` on every launch — 1,534 ms
+against 427 ms — so the folder version opens in a third of the time, and it
+works where policy makes `%TEMP%` non-executable.
 
 ![the demo stone rendered as table, side and 3/4 views above its cutting instructions](docs/demo.png)
 
@@ -178,7 +183,8 @@ Produces `dist/GCSViewer.exe` (~30 MB, single file, no console window) and
 copies it over `GCSViewer.exe` at the repo root — same name, same path, so
 the file association survives the rebuild. `--onedir` builds a folder instead,
 which avoids the `%TEMP%` unpack that `--onefile` performs on every launch and
-works where policy makes `%TEMP%` non-executable.
+works where policy makes `%TEMP%` non-executable. Both are attached to every
+release.
 
 An unsigned executable downloaded from the internet trips Windows SmartScreen
 until it earns reputation: expect **More info → Run anyway** once.

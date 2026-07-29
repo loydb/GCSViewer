@@ -37,7 +37,7 @@ from PIL import Image, ImageDraw, ImageFont
 # that disagrees with this.  A viewer handed out as a bare .exe has no other
 # way to answer "which build is this?" - and this project has already shipped
 # a binary four weeks behind its own source once.
-__version__ = "1.0.8"
+__version__ = "1.0.9"
 
 # ----------------------------------------------------------------------------
 # Parsing
@@ -1060,15 +1060,40 @@ def version_string():
         __version__, kind, *sys.version_info[:3])
 
 
+def _attach_console():
+    """Borrow the console that launched us, if there was one.
+
+    A --windowed build is linked without one, so `GCSViewer.exe --version`
+    typed at a prompt has nowhere to answer.  Windows will attach the parent
+    process's console on request, and CONOUT$ then writes to it.
+    """
+    if os.name != "nt":
+        return False
+    try:
+        import ctypes
+        ATTACH_PARENT_PROCESS = -1
+        if not ctypes.windll.kernel32.AttachConsole(ATTACH_PARENT_PROCESS):
+            return False
+        sys.stdout = open("CONOUT$", "w", buffering=1)
+        sys.stderr = sys.stdout
+        return True
+    except Exception:
+        return False
+
+
 def _tell(text):
     """Say something to whoever ran the program, wherever they can hear it.
 
-    A --windowed build has no console: CPython's print() sees sys.stdout is
-    None and returns silently, so `GCSViewer.exe --version` double-clicked or
-    run from Explorer would answer nothing at all.  Redirected to a file it
-    prints normally, which is the case CI uses.
+    Three cases, because a --windowed build has no console of its own and
+    CPython's print() returns *silently* when sys.stdout is None rather than
+    raising: output redirected to a file still prints, a prompt gets the text
+    through the parent's console, and a double-click - which has neither -
+    gets a message box.
     """
     if getattr(sys, "stdout", None) is not None:
+        print(text)
+        return
+    if _attach_console():
         print(text)
         return
     if os.environ.get("GCS_VIEWER_NO_GUI"):
