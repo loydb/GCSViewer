@@ -70,6 +70,51 @@ def is_folder_build(exe_path):
     return os.path.isdir(os.path.join(os.path.dirname(exe_path), "_internal"))
 
 
+def write_version_file():
+    """Emit the Windows version resource PyInstaller compiles into the exe.
+
+    Without one the binary carries no FileDescription, and Windows falls back
+    to naming it by its filename: the app shows up as "GCSViewer.exe" in
+    MuiCache, in Task Manager, in the file's Properties tab and anywhere else
+    the shell asks a program what it is called.  The Open-with entry reads
+    FriendlyAppName from the registry and looks right, which is what makes
+    this easy to miss - every other surface in Windows shows the filename.
+
+    Generated from __version__ so it cannot drift from the tag.
+    """
+    import re as _re
+    with open(ENTRY, encoding="utf-8") as fh:
+        m = _re.search(r'^__version__ = "([^"]+)"', fh.read(), _re.M)
+    version = m.group(1) if m else "0.0.0"
+    parts = (version.split(".") + ["0", "0", "0", "0"])[:4]
+    quad = ", ".join(str(int(p)) if p.isdigit() else "0" for p in parts)
+
+    text = """VSVersionInfo(
+  ffi=FixedFileInfo(filevers=(%s), prodvers=(%s), mask=0x3f, flags=0x0,
+                    OS=0x40004, fileType=0x1, subtype=0x0, date=(0, 0)),
+  kids=[
+    StringFileInfo([StringTable('040904B0', [
+        StringStruct('CompanyName', 'GCS Viewer'),
+        StringStruct('FileDescription', 'GCS Viewer'),
+        StringStruct('FileVersion', '%s'),
+        StringStruct('InternalName', 'GCSViewer'),
+        StringStruct('LegalCopyright', 'MIT licence'),
+        StringStruct('OriginalFilename', 'GCSViewer.exe'),
+        StringStruct('ProductName', 'GCS Viewer'),
+        StringStruct('ProductVersion', '%s')])]),
+    VarFileInfo([VarStruct('Translation', [1033, 1200])])
+  ]
+)
+""" % (quad, quad, version, version)
+
+    os.makedirs(os.path.join(HERE, "build"), exist_ok=True)
+    path = os.path.join(HERE, "build", "version_info.txt")
+    with open(path, "w", encoding="utf-8", newline="\n") as fh:
+        fh.write(text)
+    print("version resource: %s (%s)" % (path, version))
+    return path
+
+
 def main():
     if "--clean" in sys.argv:
         for d in ("build", "dist"):
@@ -100,6 +145,9 @@ def main():
     icon = os.path.join(HERE, "docs", "gcsviewer.ico")
     if os.path.exists(icon):
         cmd[cmd.index("--name"):cmd.index("--name")] = ["--icon", icon]
+
+    vfile = write_version_file()
+    cmd[cmd.index("--name"):cmd.index("--name")] = ["--version-file", vfile]
 
     print(" ".join(cmd))
     r = subprocess.run(cmd, cwd=HERE)

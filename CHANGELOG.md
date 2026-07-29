@@ -5,6 +5,17 @@ Every release is built, self-tested and published by
 publish a tag that disagrees with `__version__` and refuses to ship an
 executable whose frozen code does not match the committed source.
 
+## 1.0.21
+
+- **The executable now describes itself.** It carried no Windows version
+  resource, so everywhere the shell asks a program what it is called — the
+  Properties tab, Task Manager, the name cache the Open-with lists draw on —
+  Windows fell back to the filename and showed `GCSViewer.exe`. It now
+  reports **GCS Viewer** with its version, generated from `__version__` at
+  build time so it cannot drift from the tag.
+- Easy to miss, because the Open-with entry reads its name from the registry
+  and looked correct while every other surface in Windows showed the filename.
+
 ## 1.0.20
 
 - **The app now appears in Settings → Apps → Default apps.** The ProgId had
