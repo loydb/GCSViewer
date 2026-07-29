@@ -28,6 +28,16 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gcs_viewer as gv
 
+# A suite must not be able to die on its own output.  These checks describe
+# designs named in French, Vietnamese and Greek, and a build agent's console
+# is cp1252: printing one of those names raised UnicodeEncodeError and took
+# the whole run down *after* the checks had passed.
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
 PASS = 0
 FAIL = []
 
@@ -357,14 +367,18 @@ def test_write_gcs_bytes(tmp):
           b"\r\n" not in raw, raw[:80])
     check("bytes: and it is valid UTF-8", raw.decode("utf-8") is not None)
 
-    # a title outside the machine's code page must survive being written; on
-    # a machine with a legacy code page the old path raised instead
-    for title in ("Fleur en rêve", "Hoa Sen 花", "Ω"):
+    # A title outside the machine's code page must survive being written; on
+    # a machine with a legacy code page the old path raised instead.  The
+    # check names stay ASCII - naming them after the titles is what made an
+    # earlier version of this test kill the run on a cp1252 console.
+    for label, title in (("an accented Latin title", "Fleur en rêve"),
+                         ("a CJK title", "Hoa Sen 花"),
+                         ("a Greek title", "Ω omega")):
         q = os.path.join(tmp, "uni.gcs")
         gv.write_gcs(q, facets, {"title": title}, {"color": (.5, .5, .5)})
         back = gv.parse_gcs(q)[1].get("title")
-        check("bytes: %r survives a write and re-read" % title,
-              back == title, back)
+        check("bytes: %s survives a write and re-read" % label,
+              back == title, repr(back))
 
 
 def test_write_gcs_same_named_tiers(tmp):

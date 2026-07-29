@@ -21,6 +21,14 @@ import tempfile
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 os.environ.setdefault("GCS_VIEWER_NO_GUI", "1")
 
+# see the same note in test_gcs_viewer.py: a build agent's console is cp1252,
+# and a suite must not be able to die on the text it prints
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
 PASS = 0
 FAIL = []
 
