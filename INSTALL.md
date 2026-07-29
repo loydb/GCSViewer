@@ -189,6 +189,12 @@ same.
 installer remembers where it last registered, so it will tell you if the copy
 moved and which file types are affected.
 
+If a default you set has gone stale, **re-picking the viewer will not fix it
+on its own.** The stale entry already names this app, so Windows sees no
+change and greys out **Always**. Pick a different program (Notepad will do)
+and confirm with **Always**, then pick GCS Viewer the same way — the first
+step replaces the stale entry, which makes the second a real change.
+
 Moving breaks a default you **explicitly set**, and only that. Windows ties a
 saved choice to the app registration as it stood when you picked it, so after
 a move a double-click on that type does nothing at all — it does not fall back

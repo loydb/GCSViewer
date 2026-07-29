@@ -5,6 +5,16 @@ Every release is built, self-tested and published by
 publish a tag that disagrees with `__version__` and refuses to ship an
 executable whose frozen code does not match the committed source.
 
+## 1.0.24
+
+- **The moved-install warning now gives advice that actually works.** It said
+  "set it again", which is precisely what Windows refuses: the stale entry
+  already names this app, so re-picking it is not a change and the **Always**
+  button is greyed out. Set-but-invalid, and unfixable by picking the same
+  app. The warning now spells out the two-step escape — pick another program
+  and confirm, then pick GCS Viewer — which makes the second pick a real
+  change Windows will accept.
+
 ## 1.0.23
 
 - **The install guide told you to extract both downloads the same way, and

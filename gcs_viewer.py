@@ -37,7 +37,7 @@ from PIL import Image, ImageDraw, ImageFont
 # that disagrees with this.  A viewer handed out as a bare .exe has no other
 # way to answer "which build is this?" - and this project has already shipped
 # a binary four weeks behind its own source once.
-__version__ = "1.0.23"
+__version__ = "1.0.24"
 
 # ----------------------------------------------------------------------------
 # Parsing

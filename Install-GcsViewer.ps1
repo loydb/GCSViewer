@@ -125,9 +125,20 @@ if ($broken) {
     Write-Host "        was  $prev"
     Write-Host "        now  $launcher"
     Write-Host "      Windows ties a saved default to where the program was when you"
-    Write-Host "      picked it, so the default for $($broken -join ' and ') is now stale and"
-    Write-Host "      double-clicking one will do nothing. Set it again (below) - once."
+    Write-Host "      picked it, so the default for $($broken -join ' and ') is now stale."
+    Write-Host "      Double-clicking one does nothing at all - no error, no prompt."
     Write-Host "      Anything you never explicitly set has followed the move already."
+    Write-Host ""
+    Write-Host "      Re-picking GCS Viewer will NOT fix it on its own: the saved" -ForegroundColor Yellow
+    Write-Host "      choice already names this app, so Windows sees no change and" -ForegroundColor Yellow
+    Write-Host "      greys out the Always button.  Break it in two steps:" -ForegroundColor Yellow
+    foreach ($ext in $broken) {
+        Write-Host "        1. right-click a $ext > Open with > Choose another app >"
+        Write-Host "           pick Notepad > Always"
+        Write-Host "        2. do it again, picking GCS Viewer > Always"
+    }
+    Write-Host "      Step 1 replaces the stale entry with a valid one, which makes"
+    Write-Host "      step 2 a real change that Windows will accept."
 }
 
 Write-Host ""
