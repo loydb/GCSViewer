@@ -5,6 +5,13 @@ Every release is built, self-tested and published by
 publish a tag that disagrees with `__version__` and refuses to ship an
 executable whose frozen code does not match the committed source.
 
+## 1.0.16
+
+- The windowed suite now presses the keys rather than calling the methods
+  behind them, through Tk's own event dispatch. Everything it checked before
+  would have passed with a binding removed or bound to the wrong key; two
+  mutations now prove otherwise.
+
 ## 1.0.15
 
 - Browsing checks: the caches that make arrowing quick must not grow with the

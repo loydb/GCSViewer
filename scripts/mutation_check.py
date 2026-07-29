@@ -95,6 +95,12 @@ MUTATIONS = [
     ("let the 3/4 view tilt past vertical",
      "self.el = max(-88.0, min(88.0, self.el + dele))",
      "self.el = self.el + dele"),
+    ("leave the right arrow key unbound",
+     'self.root.bind("<Right>", lambda e: self._step_file(1))',
+     'self.root.bind("<F13>", lambda e: self._step_file(1))'),
+    ("bind grayscale to the wrong key",
+     'self.root.bind("g", lambda e: self._toggle("gray"))',
+     'self.root.bind("G", lambda e: self._toggle("gray"))'),
 ]
 
 # labels above that only the windowed suite can catch
@@ -102,6 +108,8 @@ GUI_ONLY = {
     "step through the folder in one direction whatever key is pressed",
     "stop the folder walk at the first unreadable design",
     "let the 3/4 view tilt past vertical",
+    "leave the right arrow key unbound",
+    "bind grayscale to the wrong key",
 }
 
 
