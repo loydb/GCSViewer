@@ -186,6 +186,17 @@ Setting the viewer as the default does not remove anything else. Gem Cut
 Studio, or whatever else you have, stays available on both file types through
 **Open with** — it just stops being what a double-click reaches.
 
+To check that the registration took without opening any dialogs:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\Show-OpenWithList.ps1
+```
+
+That asks the shell the same question its own picker asks
+(`SHAssocEnumHandlers`) and prints what would be offered for both extensions,
+plus the current default for each. It exists because the viewer was once
+correctly registered as a handler and still absent from that list.
+
 If you later move the install, Windows discards the default and starts asking
 again; re-run `Install-GcsViewer.ps1` from the new location and repeat this
 section.
