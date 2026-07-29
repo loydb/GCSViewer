@@ -5,6 +5,12 @@ Every release is built, self-tested and published by
 publish a tag that disagrees with `__version__` and refuses to ship an
 executable whose frozen code does not match the committed source.
 
+## 1.0.15
+
+- Browsing checks: the caches that make arrowing quick must not grow with the
+  walk. Measured alongside them — 200 steps through a 996-design folder ends
+  0.3 MB below where it started, with all three caches pinned at their bounds.
+
 ## 1.0.14
 
 - **The Start Menu shortcut did nothing.** The installer creates one —

@@ -138,6 +138,22 @@ def main():
                   "1 / 3" in app.status.cget("text"),
                   app.status.cget("text"))
 
+            # Browsing is what this program is for - a real folder here holds
+            # a thousand designs - so the caches that make it quick must not
+            # grow with the walk.  Measured separately: 200 steps through a
+            # 996-design folder ends 0.3 MB below where it started.
+            for _ in range(30):
+                app._step_file(1)
+            pump(app)
+            check("browsing: the instruction cache stays at its bound",
+                  len(gv._INSTR_CACHE) <= 4, len(gv._INSTR_CACHE))
+            check("browsing: the folder cache does not grow with the walk",
+                  len(gv._FOLDER_CACHE) <= 8, len(gv._FOLDER_CACHE))
+            check("browsing: the text-fitting cache stays at its bound",
+                  len(gv._FIT_CACHE) <= 8, len(gv._FIT_CACHE))
+            check("browsing: and it is still on a real design",
+                  os.path.isfile(app.path), app.path)
+
             # -- the 3/4 view --
             az0, el0 = app.az, app.el
             app._nudge(0, 6)

@@ -226,7 +226,7 @@ background, leaving a crown floating with no stone under it.
 
 ```bash
 python test_gcs_viewer.py     # 168 checks
-python test_gui.py            # 26 checks, the window itself
+python test_gui.py            # 30 checks, the window itself
 ```
 
 No fixtures on disk and no third-party design files: every stone is
