@@ -264,7 +264,7 @@ background, leaving a crown floating with no stone under it.
 ## Tests
 
 ```bash
-python test_gcs_viewer.py     # 173 checks
+python test_gcs_viewer.py     # 180 checks
 python test_gui.py            # 37 checks, the window itself
 ```
 

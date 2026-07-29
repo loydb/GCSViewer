@@ -5,6 +5,20 @@ Every release is built, self-tested and published by
 publish a tag that disagrees with `__version__` and refuses to ship an
 executable whose frozen code does not match the committed source.
 
+## 1.0.18
+
+- The installation guide, rewritten around the step people actually get stuck
+  on. It now describes the dialog Windows 11 really shows (**Always** /
+  **Just once** buttons, not the old checkbox), says that a design program
+  already on the machine claims these extensions too and may be pre-selected,
+  and makes clear that choosing the viewer does not remove it — it stays on
+  **Open with**. Moving an install invalidates the default and brings that
+  dialog back, which is now said out loud under Updating.
+- `build_exe.py` installs over the copy Windows actually launches, read from
+  the registry rather than assumed, and refuses to write a single-file build
+  over a folder install or the reverse.
+- No change to the program itself.
+
 ## 1.0.17
 
 - **What `write_gcs` writes no longer depends on the machine writing it.**
