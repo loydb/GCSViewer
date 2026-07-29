@@ -95,4 +95,61 @@ foreach ($ext in @('.gcs', '.gem')) {
     else     { "current default for $ext : not set - pick it once, see INSTALL.md" }
 }
 
+# --- stale entries -------------------------------------------------------
+#
+# An app that has been uninstalled, renamed or moved leaves entries behind
+# that keep it in the Open-with list pointing at a file that is no longer
+# there.  They hide in more places than is obvious: an auto-generated
+# <ext>_auto_file ProgId, that ProgId listed under the extension's
+# OpenWithProgids, a friendly name in MuiCache, and - the one that outlives
+# an explorer.exe restart and a registry sweep of the obvious subtrees -
+# ApplicationAssociationToasts.  Finding one of those took four searches by
+# hand; this finds all four at once.
+#
+# Reported, never deleted.  These are the user's associations, not ours.
+Write-Host ""
+Write-Host "=== stale entries (targets that no longer exist) ===" -ForegroundColor Cyan
+$stale = @()
+
+foreach ($ext in @('.gcs', '.gem')) {
+    $auto = "HKCU:\Software\Classes\$($ext.TrimStart('.'))_auto_file\shell\open\command"
+    $cmd = (Get-ItemProperty $auto -Name '(default)' -ErrorAction SilentlyContinue).'(default)'
+    if ($cmd) {
+        $exe = if ($cmd -match '"([^"]+)"') { $matches[1] } else { ($cmd -split ' ')[0] }
+        if (-not (Test-Path $exe)) {
+            $stale += "reg delete `"HKCU\Software\Classes\$($ext.TrimStart('.'))_auto_file`" /f"
+            Write-Host "  $ext auto_file ProgId -> $exe  (missing)"
+        }
+    }
+    $owp = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\$ext\OpenWithProgids"
+    foreach ($n in (Get-Item $owp -ErrorAction SilentlyContinue).Property) {
+        if ($n -like '*_auto_file' -and -not (Test-Path "HKCU:\Software\Classes\$n")) {
+            $stale += "reg delete `"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\$ext\OpenWithProgids`" /v `"$n`" /f"
+            Write-Host "  $ext OpenWithProgids -> $n  (ProgId gone)"
+        }
+    }
+}
+
+$toastKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\ApplicationAssociationToasts"
+foreach ($n in (Get-Item $toastKey -ErrorAction SilentlyContinue).Property) {
+    if ($n -match '^Applications\\(.+?)_(\.[A-Za-z0-9]+)$') {
+        $app = $matches[1]
+        if (-not (Get-Item "HKCU:\Software\Classes\Applications\$app" -ErrorAction SilentlyContinue) -and
+            -not (Get-Item "HKLM:\SOFTWARE\Classes\Applications\$app" -ErrorAction SilentlyContinue)) {
+            $stale += "reg delete `"HKCU\Software\Microsoft\Windows\CurrentVersion\ApplicationAssociationToasts`" /v `"$n`" /f"
+            Write-Host "  association toast -> $n  (no such application registered)"
+        }
+    }
+}
+
+if (-not $stale) {
+    Write-Host "  none"
+} else {
+    Write-Host ""
+    Write-Host "  To clear them, run these - they are your associations, so this" -ForegroundColor Yellow
+    Write-Host "  script prints them rather than running them:" -ForegroundColor Yellow
+    $stale | Sort-Object -Unique | ForEach-Object { "    $_" }
+    Write-Host "  Then restart explorer.exe: the Open-with menu is cached."
+}
+
 if ($missing) { exit 1 }

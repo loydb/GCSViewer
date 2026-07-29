@@ -197,6 +197,16 @@ That asks the shell the same question its own picker asks
 plus the current default for each. It exists because the viewer was once
 correctly registered as a handler and still absent from that list.
 
+It also reports **stale entries** — an app that was uninstalled, renamed or
+moved leaves registrations behind that keep it in the Open-with menu pointing
+at a file that is no longer there. Those hide in four places: an
+auto-generated `<ext>_auto_file` ProgId, that ProgId under the extension's
+`OpenWithProgids`, a name in `MuiCache`, and `ApplicationAssociationToasts` —
+the last of which survives both an `explorer.exe` restart and a registry sweep
+of the subtrees you would think to search. The script prints the `reg delete`
+commands rather than running them; they are your associations, not the
+viewer's.
+
 If you later move the install, Windows discards the default and starts asking
 again; re-run `Install-GcsViewer.ps1` from the new location and repeat this
 section.
