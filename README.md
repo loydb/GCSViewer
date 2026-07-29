@@ -61,7 +61,7 @@ stored in the file:
 |---|---|
 | **Table (top)** | straight down the optic axis |
 | **Side** | the girdle profile |
-| **3/4 view** | angled, and you can spin it with the mouse |
+| **3/4 view** | angled — drag to turn it, arrow keys to tip it |
 
 Below them, the **cutting sequence** — tier, angle, index list and the
 instruction the file carries — grouped into Pavilion and Crown, laid out like
@@ -80,7 +80,7 @@ exactly that, and a black square reads as a broken viewer.
 
 Dragging redraws only the 3/4 panel, at reduced sampling while the mouse is
 down, and the cutting table is memoised on its own contents — it does not
-change while you spin the stone, and redrawing it was 40% of a frame on an
+change while you turn the stone, and redrawing it was 40% of a frame on an
 ordinary design and two thirds of one on the heaviest in the collection
 (4,200 facets: 242 ms a frame, now 76 ms).
 
@@ -113,8 +113,8 @@ There is no `.asc` support, by design.
 | Key | Does |
 |---|---|
 | **← →** | previous / next design in the same folder, wrapping, in Explorer's sort order |
-| **drag** | spin the 3/4 view |
-| **↑ ↓** | tilt the 3/4 view |
+| **drag** | turn the 3/4 view left and right |
+| **↑ ↓** | tip the 3/4 view up and down |
 | **I** | show / hide the instructions table |
 | **G** | grayscale |
 | **L** | tier labels |

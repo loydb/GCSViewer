@@ -2,7 +2,7 @@
 
 A small Windows app that shows a faceted gem from a **Gemcut Studio `.gcs`**
 or **GemCad `.gem`** file as three shaded views — **table (top)**, **side**,
-and a **3/4 view you can spin** — plus a **cutting-instructions table**
+and a **3/4 view you can turn** — plus a **cutting-instructions table**
 (tier, angle, indices, comments) like Gem Cut Studio's sequence panel.
 `.gcs` files are tinted with the stone's own material colour; `.gem` files
 (which don't store a colour) render as a neutral pale stone.
@@ -76,26 +76,38 @@ current user only.
    > **Tip:** if PowerShell blocks the script, the `-ExecutionPolicy Bypass`
    > above already handles it. You do **not** need to run as Administrator.
 
-4. **Set GCS Viewer as the default (one time).** For security, Windows does
-   not let a program silently make itself the default for a file type — *you*
-   have to pick it once:
+4. **Set GCS Viewer as the default (one time, per file type).** Windows does
+   not let a program make itself the default for a file type — *you* have to
+   pick it once:
 
    - In File Explorer, **right-click any `.gcs` file** →
      **Open with** → **Choose another app**.
-   - Pick **GCS Viewer** from the list.
-   - **If "GCS Viewer" isn't in the list** (common on Windows 11): scroll to
-     the bottom of the dialog and click **Choose an app on your PC** (on older
-     Windows: **More apps** → **Look for another app on this PC**). Then browse
-     to **`GCSViewer.exe`** in the folder where you extracted this package and
-     select it.
-   - Tick **Always use this app to open .gcs files** → **OK**.
-   - **If you also have `.gem` files,** repeat this once for a `.gem` file —
-     Windows tracks the default separately per file type.
+   - Click **GCS Viewer** to select it.
+   - Click **Always**. (Windows 11 shows **Always** and **Just once** buttons
+     at the foot of the dialog. Older versions instead show a checkbox reading
+     *"Always use this app to open .gcs files"* — tick it, then **OK**.)
+   - **Repeat once for a `.gem` file.** Windows tracks the default separately
+     per file type, so setting `.gcs` does nothing for `.gem`.
+
+   **If "GCS Viewer" isn't in the list** (common on Windows 11): scroll to the
+   bottom of the dialog and click **Choose an app on your PC** (older Windows:
+   **More apps** → **Look for another app on this PC**), browse to
+   **`GCSViewer.exe`** where you extracted this package, then **Always**.
+
+   **If a design program is already installed,** it very likely claims `.gcs`
+   and `.gem` too, and the dialog may pre-select it. Check that the **GCS
+   Viewer** entry is the highlighted one before you commit. Setting the viewer
+   as the default does not remove the other program — it stays available on
+   both file types through **Open with**, it just stops being what a
+   double-click reaches.
 
    From now on, **double-clicking a `.gcs` or `.gem` file opens the viewer.**
 
    > Windows blocks programs from setting themselves as the default for a file
-   > type — only you can, through this dialog. That's why this step is manual.
+   > type. The setting lives in a registry value carrying a hash and a deny
+   > ACE, so that only the shell can write it — which is why this step is
+   > manual, and why anything claiming to automate it is either forging that
+   > hash or not working.
 
 > **First launch note:** Windows SmartScreen may ask whether you want to run
 > an unsigned program downloaded from the internet — click
@@ -108,8 +120,8 @@ current user only.
 - **Left / Right arrows** — step to the previous / next `.gcs` or `.gem` file
   in the same folder (wraps around), just like the Windows photo viewer.
   Files it cannot read are skipped rather than stopping the walk.
-- **Drag** the 3/4 view with the mouse to spin the stone.
-- **Up / Down arrows** — tilt the 3/4 view.
+- **Drag** the 3/4 view with the mouse to turn the stone left and right.
+- **Up / Down arrows** — tip it up and down.
 - **I** — toggle the **Instructions** table below the renders (tier name,
   cutting angle, index list, and the cutting instruction / comment, grouped
   into Pavilion and Crown — like the Gem Cut Studio sequence panel).
@@ -157,7 +169,13 @@ message box that nobody is there to dismiss.
 Replace `GCSViewer.exe` in the install folder with the new version — for the
 folder build, replace the whole folder. The file association points at that
 path, so no re-install is needed as long as the name and location stay the
-same. (If you move it, re-run `Install-GcsViewer.ps1` from the new location.)
+same.
+
+**If you move it**, re-run `Install-GcsViewer.ps1` from the new location — and
+expect Windows to ask which program to use the next time you double-click a
+design. Changing the path invalidates the default you picked, so you set it
+once more, exactly as in step 4. Moving between the single-file and folder
+downloads counts as moving it.
 
 To check what you are running, look at the window's title bar, or run
 `.\GCSViewer.exe --version`.
