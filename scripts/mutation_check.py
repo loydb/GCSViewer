@@ -160,6 +160,15 @@ def main():
     for suite in ("test_gcs_viewer.py", "test_gui.py"):
         if os.path.exists(os.path.join(HERE, suite)):
             shutil.copy2(os.path.join(HERE, suite), tmp)
+    # the suite also imports build_exe, to check that an install goes to the
+    # copy Windows actually launches.  It is not mutated - it is not part of
+    # the program - but without it here the baseline run fails to import and
+    # every mutation looks caught for the wrong reason.
+    os.makedirs(os.path.join(tmp, "scripts"), exist_ok=True)
+    for helper in ("build_exe.py",):
+        h = os.path.join(HERE, "scripts", helper)
+        if os.path.exists(h):
+            shutil.copy2(h, os.path.join(tmp, "scripts"))
     target = os.path.join(tmp, "gcs_viewer.py")
 
     shutil.copy2(src, target)

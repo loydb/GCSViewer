@@ -1157,6 +1157,47 @@ def test_no_argument_launch(tmp):
         gv._ask_for_design, gv._error_window = real_ask, real_err
 
 
+def test_install_target(tmp):
+    """build_exe installs over the copy Windows launches, which it reads from
+    the registry.  Getting that path out of a shell-open command string is the
+    part that can silently go wrong - and installing to the wrong place is how
+    an exe ends up weeks behind its own source."""
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                    "scripts"))
+    import build_exe
+
+    cases = [
+        (r'"D:\Tools\GCS Viewer\GCSViewer.exe" "%1"',
+         r"D:\Tools\GCS Viewer\GCSViewer.exe"),
+        (r'"C:\Program Files\GCSViewer\GCSViewer.exe" "%1"',
+         r"C:\Program Files\GCSViewer\GCSViewer.exe"),
+        (r'C:\tools\GCSViewer.exe %1', r"C:\tools\GCSViewer.exe"),
+        (r'  "D:\a b\c.exe"  "%1" ', r"D:\a b\c.exe"),
+    ]
+    for cmd, want in cases:
+        got = build_exe.exe_from_command(cmd)
+        check("install: path parsed from %s" %
+              ("a quoted command" if cmd.strip().startswith('"')
+               else "an unquoted command"),
+              got == want, "%r -> %r, wanted %r" % (cmd, got, want))
+    check("install: nothing registered parses as nothing",
+          build_exe.exe_from_command("") is None and
+          build_exe.exe_from_command(None) is None)
+
+    # a folder build is recognised by the _internal directory beside the exe,
+    # which is what stops a single-file build being copied over one
+    folder = os.path.join(tmp, "folderbuild")
+    os.makedirs(os.path.join(folder, "_internal"), exist_ok=True)
+    fexe = os.path.join(folder, "GCSViewer.exe")
+    open(fexe, "wb").close()
+    onefile = os.path.join(tmp, "GCSViewer.exe")
+    open(onefile, "wb").close()
+    check("install: a folder build is recognised",
+          build_exe.is_folder_build(fexe) is True)
+    check("install: a single-file build is not mistaken for one",
+          build_exe.is_folder_build(onefile) is False)
+
+
 def test_selftest(tmp):
     """The frozen exe runs exactly this to prove its bundle is complete."""
     report = os.path.join(tmp, "selftest.txt")
@@ -1196,6 +1237,7 @@ def main():
         test_save_cli(tmp)
         test_version()
         test_no_argument_launch(tmp)
+        test_install_target(tmp)
         test_selftest(tmp)
 
     print("\n%d checks passed, %d failed" % (PASS, len(FAIL)))

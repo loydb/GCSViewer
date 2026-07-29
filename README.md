@@ -202,11 +202,20 @@ to dismiss.
 python scripts/build_exe.py --clean
 ```
 
-Produces `dist/GCSViewer.exe` (~30 MB, single file, no console window) and
-copies it over `GCSViewer.exe` at the repo root — same name, same path, so
-the file association survives the rebuild. `--onedir` builds a folder instead,
-which avoids the `%TEMP%` unpack that `--onefile` performs on every launch and
-works where policy makes `%TEMP%` non-executable. Both are attached to every
+Produces `dist/GCSViewer.exe` (~30 MB, single file, no console window), then
+updates **the copy Windows actually launches** — the path is read out of the
+`.gcs` association in the registry, not assumed. Rebuilding into a binary
+nobody launches is exactly how this project once shipped an exe four weeks
+behind its own source, and moving an install re-creates that trap silently.
+
+If the registered copy is a folder build and you built `--onefile`, or the
+reverse, it installs nothing and says so rather than writing a broken mixture
+of the two shapes. `--no-install` skips the step entirely; with nothing
+registered it falls back to the repo root.
+
+`--onedir` builds a folder instead, which avoids the `%TEMP%` unpack that
+`--onefile` performs on every launch and works where policy makes `%TEMP%`
+non-executable. Both are attached to every
 release.
 
 An unsigned executable downloaded from the internet trips Windows SmartScreen
