@@ -30,6 +30,11 @@ Set-ItemProperty "$classes\$progId"                    "(default)" "Gemcut Studi
 Set-ItemProperty "$classes\$progId\shell\open"         "(default)" "View gem"
 Set-ItemProperty "$classes\$progId\shell\open\command" "(default)" $cmd
 
+# Icon for .gcs / .gem documents in Explorer - index 0 is the icon compiled
+# into the exe, so there is no separate .ico file to keep alongside it
+New-Item -Path "$classes\$progId\DefaultIcon" -Force | Out-Null
+Set-ItemProperty "$classes\$progId\DefaultIcon"        "(default)" "`"$launcher`",0"
+
 # Named application that appears in the "Open with" list
 New-Item -Path "$classes\Applications\$appKey\shell\open\command" -Force | Out-Null
 Set-ItemProperty "$classes\Applications\$appKey"                    "(default)"       "GCS Viewer"

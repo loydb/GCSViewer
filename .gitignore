@@ -18,6 +18,7 @@ local/
 *.png
 !docs/demo.gcs
 !docs/demo.png
+!docs/icon-preview.png
 *_views.png
 
 # packaged distribution

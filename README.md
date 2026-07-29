@@ -104,6 +104,9 @@ interpreter and every library are inside the executable.
    **Choose another app** → **GCS Viewer** → tick **Always**. Repeat once for
    `.gem` if you have those too.
 
+Step 2 also registers the document icon, so `.gcs` and `.gem` files stop
+showing Explorer's blank page and show a gem instead.
+
 Step 3 is manual because Windows will not let a program make itself the
 default handler for a file type. The authoritative setting lives in
 `HKCU\...\Explorer\FileExts\<ext>\UserChoice`, which carries a hash and a deny
@@ -171,9 +174,20 @@ three changes it was missing.
 
 ```bash
 python scripts/make_demo.py
+python scripts/gen_icon.py
 ```
 
-Regenerates `docs/demo.gcs` and `docs/demo.png`.
+`make_demo.py` regenerates `docs/demo.gcs` and `docs/demo.png`.
+`gen_icon.py` regenerates `docs/gcsviewer.ico`, which `build_exe.py` compiles
+into the executable and the installer points `.gcs` and `.gem` documents at.
+
+![the icon at 16, 24, 32, 48, 64, 128 and 256 pixels](docs/icon-preview.png)
+
+The icon is the demo stone, drawn by the viewer's own renderer rather than by
+hand, so it cannot drift from what the program produces. Its alpha comes from
+a second pass with the lighting flattened to white: keying the colour pass
+would have deleted the pavilion, which sits only a few levels above the
+background, leaving a crown floating with no stone under it.
 
 ## Tests
 
