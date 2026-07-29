@@ -499,6 +499,14 @@ def render_view(facets, basis, scale, color, size=620, ss=2,
         drawables.append((depth, sx, sy, rgb, f["tier"]))
 
     if not drawables:
+        # Not necessarily a fault.  A preform is cut girdle-first and has no
+        # crown yet, so from straight above nothing faces the camera and the
+        # panel is legitimately empty - four designs in the reference
+        # collection are exactly this.  Say so, rather than showing a black
+        # square that reads as a broken viewer.
+        d.text((S / 2, S / 2), "no facets face this view",
+               fill=(120, 120, 128), font=_load_font(int(15 * ss)),
+               anchor="mm")
         return img.resize((size, size), Image.LANCZOS)
 
     allx = np.concatenate([t[1] for t in drawables])

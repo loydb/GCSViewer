@@ -689,6 +689,17 @@ def test_render():
           gv.render_view([], gv.view_basis(0, 0), 1.0, (0.5, 0.5, 0.5),
                          size=64, ss=1).size == (64, 64))
 
+    # a real preform - girdle and pavilion cut, no crown yet - has nothing
+    # facing the table view at all, and four designs in the collection are
+    # exactly that
+    preform = [f for f in facets if f["tier"] in ("P1", "g1")]
+    top = np.asarray(gv.render_view(preform, gv.view_basis(0, 90), scale,
+                                    (0.8, 0.8, 0.8), size=200, ss=2,
+                                    labels=False)).astype(int)
+    ink = (np.abs(top - np.array([14, 14, 16])).max(axis=2) > 8).sum()
+    check("render: a crownless preform's table view is annotated, not blank",
+          0 < ink < 200 * 200 * 0.2, ink)
+
     labelled = np.asarray(gv.render_view(facets, gv.view_basis(0, 90), scale,
                                          (0.2, 0.55, 0.9), size=200, ss=2,
                                          labels=True)).astype(int)
@@ -727,16 +738,28 @@ def test_depth_order_and_culling():
                                 [1., 1., 0.], [-1., 1., 0.]]),
              "normal": np.array([0., 0., -1.]), "tier": "", "instr": "",
              "tid": 0}]
+    # Rendered at the size the application uses.  render_view reserves a
+    # fixed 46*ss pixel margin, so on a small panel the facet lands in a box
+    # barely bigger than the notice and the two cannot be told apart.
+    P = 460
     img = np.asarray(gv.render_view(away, gv.view_basis(0, 90), 1.0, base,
-                                    size=120, ss=2, labels=False)).astype(int)
-    check("cull: a back-facing facet paints nothing at all",
-          int(np.abs(img - bg).max()) == 0, img[60, 60])
+                                    size=P, ss=2, labels=False)).astype(int)
+    # The facet must not be painted.  Sampled where the facet *would* be but
+    # the notice is not - the notice is one short line across the middle, and
+    # its antialiased edges pass through the very shade an unlit facet has,
+    # so a colour test would report itself.
+    band = img[60:100, :]
+    check("cull: a back-facing facet paints nothing",
+          int(np.abs(band - bg).max()) == 0, int(np.abs(band - bg).max()))
+    lit = (np.abs(img - bg).max(axis=2) > 8).sum()
+    check("cull: an empty view explains itself instead of going black",
+          0 < lit < P * P * 0.1, lit)
 
     toward = [dict(away[0], normal=np.array([0., 0., 1.]))]
     img2 = np.asarray(gv.render_view(toward, gv.view_basis(0, 90), 1.0, base,
-                                     size=120, ss=2, labels=False)).astype(int)
+                                     size=P, ss=2, labels=False)).astype(int)
     check("cull: the same facet turned around does paint",
-          int(np.abs(img2[60, 60] - bg).max()) > 20, img2[60, 60])
+          int(np.abs(img2[80, 230] - bg).max()) > 20, img2[80, 230])
 
     # 2. a small facet floating above a larger tilted one.  Both face the
     #    camera, they overlap in plan, and their normals differ - so which one

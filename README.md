@@ -48,6 +48,11 @@ instructions at all. Index positions come from each facet normal against the
 gear in the file (96 by default): a facet normal at 22.5° on a 96 gear is
 index 06.
 
+A panel with nothing facing it says so. That is not always a fault: a preform
+is cut girdle-first and has no crown yet, so seen from directly above there is
+genuinely nothing to draw — four designs in the reference collection are
+exactly that, and a black square reads as a broken viewer.
+
 Rendering is a painter's algorithm with back-face culling, one fixed light
 and a specular highlight — deliberately flat and matte. It is a drawing of the
 geometry, not a simulation of the stone: no refraction, no dispersion, no
@@ -192,7 +197,7 @@ background, leaving a crown floating with no stone under it.
 ## Tests
 
 ```bash
-python test_gcs_viewer.py     # 124 checks
+python test_gcs_viewer.py     # 132 checks
 ```
 
 No fixtures on disk and no third-party design files: every stone is
@@ -214,9 +219,9 @@ That is not a guess. Run:
 python scripts/mutation_check.py
 ```
 
-It reintroduces thirteen deliberate defects one at a time — dropping the `.gem`
+It reintroduces fourteen deliberate defects one at a time — dropping the `.gem`
 Y mirror, painting nearest-first, ignoring the gear, losing the instruction
-text — and reports which checks catch each one. Currently **13 of 13**. The
+text — and reports which checks catch each one. Currently **14 of 14**. The
 first run of this harness found three that survived, which is how the culling
 and paint-order scenes came to exist.
 
