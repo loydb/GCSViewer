@@ -340,6 +340,33 @@ def test_write_gcs_roundtrip(tmp):
     check("roundtrip: table tier angle == 0", near(tiers["T"], 0.0, 1e-9), tiers)
 
 
+def test_write_gcs_bytes(tmp):
+    """What this program writes must not depend on the machine writing it.
+
+    Handing ElementTree a path makes it open the file itself, in text mode
+    with the local code page: CRLF on Windows and LF elsewhere, so the same
+    stone converted on two machines produced different bytes - which is how
+    CI caught this, comparing a demo generated on Windows against one
+    regenerated on Linux.
+    """
+    facets = synthetic_stone()
+    p = os.path.join(tmp, "bytes.gcs")
+    gv.write_gcs(p, facets, {"title": "Bytes"}, {"color": (.5, .5, .5)})
+    raw = open(p, "rb").read()
+    check("bytes: line endings are LF, whatever the platform",
+          b"\r\n" not in raw, raw[:80])
+    check("bytes: and it is valid UTF-8", raw.decode("utf-8") is not None)
+
+    # a title outside the machine's code page must survive being written; on
+    # a machine with a legacy code page the old path raised instead
+    for title in ("Fleur en rêve", "Hoa Sen 花", "Ω"):
+        q = os.path.join(tmp, "uni.gcs")
+        gv.write_gcs(q, facets, {"title": title}, {"color": (.5, .5, .5)})
+        back = gv.parse_gcs(q)[1].get("title")
+        check("bytes: %r survives a write and re-read" % title,
+              back == title, back)
+
+
 def test_write_gcs_same_named_tiers(tmp):
     """Two <tier> elements are allowed to carry the same name, and four
     designs in the reference collection do.  Grouping the output by name
@@ -1137,6 +1164,7 @@ def main():
         test_empty_files(tmp)
         test_parse_gcs_bad_normal(tmp)
         test_write_gcs_roundtrip(tmp)
+        test_write_gcs_bytes(tmp)
         test_write_gcs_same_named_tiers(tmp)
         test_parse_gem(tmp)
         test_parse_gem_long_notes(tmp)

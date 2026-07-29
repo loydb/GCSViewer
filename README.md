@@ -225,7 +225,7 @@ background, leaving a crown floating with no stone under it.
 ## Tests
 
 ```bash
-python test_gcs_viewer.py     # 168 checks
+python test_gcs_viewer.py     # 173 checks
 python test_gui.py            # 37 checks, the window itself
 ```
 
@@ -255,9 +255,9 @@ That is not a guess. Run:
 python scripts/mutation_check.py
 ```
 
-It reintroduces twenty-five deliberate defects one at a time — dropping the `.gem`
+It reintroduces twenty-six deliberate defects one at a time — dropping the `.gem`
 Y mirror, painting nearest-first, ignoring the gear, losing the instruction
-text — and reports which checks catch each one. Currently **25 of 25**. The
+text — and reports which checks catch each one. Currently **26 of 26**. The
 first run of this harness found three that survived, which is how the culling
 and paint-order scenes came to exist.
 

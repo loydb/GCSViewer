@@ -37,7 +37,7 @@ from PIL import Image, ImageDraw, ImageFont
 # that disagrees with this.  A viewer handed out as a bare .exe has no other
 # way to answer "which build is this?" - and this project has already shipped
 # a binary four weeks behind its own source once.
-__version__ = "1.0.16"
+__version__ = "1.0.17"
 
 # ----------------------------------------------------------------------------
 # Parsing
@@ -411,7 +411,17 @@ def write_gcs(path, facets, info, material, gear=96):
     ET.SubElement(root, "info", title=title, author="", date="")
 
     ET.indent(root)
-    ET.ElementTree(root).write(path, encoding="unicode", xml_declaration=False)
+    # Written through a file opened here rather than by handing ElementTree a
+    # path.  Given a path with encoding="unicode" it opens the file itself,
+    # in text mode with the machine's locale encoding: newlines come out CRLF
+    # on Windows and LF elsewhere, so the same stone converts to different
+    # bytes on different machines, and a title outside the local code page
+    # raises rather than being written.  The reader already falls back
+    # through the code pages for files other programs wrote (see _read_xml);
+    # what this program writes is simply UTF-8 with LF, everywhere.
+    with open(path, "w", encoding="utf-8", newline="\n") as fh:
+        ET.ElementTree(root).write(fh, encoding="unicode",
+                                   xml_declaration=False)
 
 
 # ----------------------------------------------------------------------------

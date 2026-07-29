@@ -5,6 +5,15 @@ Every release is built, self-tested and published by
 publish a tag that disagrees with `__version__` and refuses to ship an
 executable whose frozen code does not match the committed source.
 
+## 1.0.17
+
+- **What `write_gcs` writes no longer depends on the machine writing it.**
+  Handing ElementTree a path makes it open the file itself, in text mode with
+  the local code page — CRLF on Windows, LF elsewhere, and a title outside
+  that code page raises instead of being written. Output is now UTF-8 with LF
+  everywhere. Found by CI: a demo stone generated on Windows and regenerated
+  on Linux did not match.
+
 ## 1.0.16
 
 - The windowed suite now presses the keys rather than calling the methods
