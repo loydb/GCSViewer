@@ -76,38 +76,40 @@ current user only.
    > **Tip:** if PowerShell blocks the script, the `-ExecutionPolicy Bypass`
    > above already handles it. You do **not** need to run as Administrator.
 
-4. **Set GCS Viewer as the default (one time, per file type).** Windows does
-   not let a program make itself the default for a file type — *you* have to
-   pick it once:
+4. **Make it the default.** Windows does not allow a program to make itself
+   the default for a file type, so this last step is yours — **once for
+   `.gcs` and once for `.gem`**, which Windows tracks separately.
 
-   - In File Explorer, **right-click any `.gcs` file** →
-     **Open with** → **Choose another app**.
-   - Click **GCS Viewer** to select it.
-   - Click **Always**. (Windows 11 shows **Always** and **Just once** buttons
-     at the foot of the dialog. Older versions instead show a checkbox reading
-     *"Always use this app to open .gcs files"* — tick it, then **OK**.)
-   - **Repeat once for a `.gem` file.** Windows tracks the default separately
-     per file type, so setting `.gcs` does nothing for `.gem`.
+   **The reliable way — Settings.** Use this if another program is already
+   opening these files.
 
-   **If "GCS Viewer" isn't in the list** (common on Windows 11): scroll to the
-   bottom of the dialog and click **Choose an app on your PC** (older Windows:
-   **More apps** → **Look for another app on this PC**), browse to
-   **`GCSViewer.exe`** where you extracted this package, then **Always**.
+   1. Open **Settings** → **Apps** → **Default apps**.
+   2. In the box labelled **Set a default for a file type or link type**,
+      type `.gcs`.
+   3. Click the **.gcs** row that appears — it shows the current default, or
+      **Choose a default**.
+   4. Pick **GCS Viewer**, then click **Set default**.
+   5. Repeat from step 2 for `.gem`.
 
-   **If a design program is already installed,** it very likely claims `.gcs`
-   and `.gem` too, and the dialog may pre-select it. Check that the **GCS
-   Viewer** entry is the highlighted one before you commit. Setting the viewer
-   as the default does not remove the other program — it stays available on
-   both file types through **Open with**, it just stops being what a
-   double-click reaches.
+   **The quicker way — from a file.** Right-click any `.gcs` file →
+   **Open with** → **Choose another app**, click **GCS Viewer**, then click
+   **Always**. Repeat on a `.gem` file.
+
+   Two things that trip this up:
+
+   - The dialog offers only **Just once** until you actually select an app.
+     Click the app first and **Always** appears.
+   - If **GCS Viewer** is not in the list at all, scroll to the very bottom
+     and click **Choose an app on your PC** (older Windows: **More apps** →
+     **Look for another app on this PC**), then browse to `GCSViewer.exe` in
+     the folder you extracted. If that happens, `Install-GcsViewer.ps1` was
+     probably not run from the folder holding that same `GCSViewer.exe`.
+
+   Setting the viewer as the default removes nothing. Gem Cut Studio, or
+   whatever else you have, stays available on both file types through
+   **Open with** — it just stops being what a double-click reaches.
 
    From now on, **double-clicking a `.gcs` or `.gem` file opens the viewer.**
-
-   > Windows blocks programs from setting themselves as the default for a file
-   > type. The setting lives in a registry value carrying a hash and a deny
-   > ACE, so that only the shell can write it — which is why this step is
-   > manual, and why anything claiming to automate it is either forging that
-   > hash or not working.
 
 > **First launch note:** Windows SmartScreen may ask whether you want to run
 > an unsigned program downloaded from the internet — click

@@ -5,6 +5,20 @@ Every release is built, self-tested and published by
 publish a tag that disagrees with `__version__` and refuses to ship an
 executable whose frozen code does not match the committed source.
 
+## 1.0.19
+
+- **The installer now registers the app with Default Programs**
+  (`RegisteredApplications` plus a `Capabilities` key). Without it Windows 11
+  builds its "Select an app to open this file" list without GCS Viewer in it,
+  even though the handler was correctly registered — the app was reachable
+  only by browsing to the .exe by hand, and did not appear in Settings →
+  Default apps at all. Found by watching the dialog rather than the registry.
+- Setting the default is now documented as its own section, with the Settings
+  route (which works when another program already owns the file type), the
+  Open-with route, and the two things that trip both up: **Always** only
+  appears once an app is selected, and a missing app means the installer was
+  not run from the folder holding that `GCSViewer.exe`.
+
 ## 1.0.18
 
 - The installation guide, rewritten around the step people actually get stuck

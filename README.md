@@ -143,27 +143,70 @@ interpreter and every library are inside the executable.
    powershell -ExecutionPolicy Bypass -File .\Install-GcsViewer.ps1
    ```
 
-3. Then **pick it once**: right-click a `.gcs` file → **Open with** →
-   **Choose another app** → **GCS Viewer** → tick **Always**. Repeat once for
-   `.gem` if you have those too.
+3. Then **make it the default** — see the next section. Windows requires you
+   to do that part by hand.
 
 Step 2 also registers the document icon, so `.gcs` and `.gem` files stop
 showing Explorer's blank page and show a gem instead, and puts a **GCS
 Viewer** entry in the Start Menu — launching it without a file asks which
 design to open.
 
-Step 3 is manual because Windows will not let a program make itself the
-default handler for a file type. The authoritative setting lives in
+## Make it the default for `.gcs` and `.gem`
+
+Windows will not let any program make itself the default for a file type, so
+this is a manual step — **once per extension**, and `.gcs` and `.gem` are
+tracked separately. Run `Install-GcsViewer.ps1` first, or GCS Viewer will not
+be offered as a choice.
+
+**The reliable way — Settings.** This works even when another program already
+owns the file type, which is the usual case if you have a design program
+installed.
+
+1. Open **Settings** → **Apps** → **Default apps**.
+2. In the box labelled **Set a default for a file type or link type**, type
+   `.gcs`.
+3. Click the row that appears for **.gcs** — it shows the current default, or
+   **Choose a default**.
+4. Pick **GCS Viewer** from the list, then click **Set default**.
+5. Repeat from step 2 for **.gem**.
+
+**The quicker way — from a file.** Right-click any `.gcs` file → **Open with**
+→ **Choose another app**, click **GCS Viewer**, then click **Always**. Repeat
+on a `.gem` file.
+
+> Two things that trip this up. The dialog offers **Just once** until you
+> actually select an app — click the app first and **Always** appears. And if
+> **GCS Viewer** is not in the list at all, scroll to the very bottom of it and
+> click **Choose an app on your PC**, then browse to `GCSViewer.exe` where you
+> installed it. A program that is registered but not *listed* usually means
+> `Install-GcsViewer.ps1` has not been run from the folder holding that
+> `GCSViewer.exe`.
+
+Setting the viewer as the default does not remove anything else. Gem Cut
+Studio, or whatever else you have, stays available on both file types through
+**Open with** — it just stops being what a double-click reaches.
+
+If you later move the install, Windows discards the default and starts asking
+again; re-run `Install-GcsViewer.ps1` from the new location and repeat this
+section.
+
+## Why the default has to be set by hand
+
+Windows will not let a program make itself the default handler for a file
+type. The authoritative setting lives in
 `HKCU\...\Explorer\FileExts\<ext>\UserChoice`, which carries a hash and a deny
 ACE so that only the shell can write it. Anything claiming to set a default
 association silently is either forging that hash or not actually working.
-Step 2 does everything a program legitimately can — the ProgId, the
-`Applications` entry, `SupportedTypes`, the Open-With MRU and a Start Menu
-shortcut, all per-user, no admin — which is what makes "GCS Viewer" appear in
-that dialog for you to choose.
+`Install-GcsViewer.ps1` does everything a program legitimately can — the
+ProgId and its document icon, the `Applications` entry, `SupportedTypes`, the
+Open-With MRU, a Start Menu shortcut, and a **Default Programs**
+registration (`RegisteredApplications` plus a `Capabilities` key), all
+per-user and without admin. That last one is what actually puts **GCS
+Viewer** in the picker and in Settings; registering the handler alone is not
+enough on Windows 11, which is why an app can be correctly associated and
+still be missing from the list of things to choose.
 
-[`INSTALL.md`](INSTALL.md) is the version to hand to somebody else, with the
-Windows 11 dialog quirks spelled out.
+[`INSTALL.md`](INSTALL.md) is the version to hand to somebody else.
 
 To update, drop the new `GCSViewer.exe` over the old one. The association
 points at the path, so the name and location are what matter.

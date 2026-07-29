@@ -54,6 +54,25 @@ foreach ($ext in @('.gcs', '.gem')) {
     Set-ItemProperty $owl "MRUList" "a"
 }
 
+# Registered application (Default Programs).  This is what makes Windows 11
+# list "GCS Viewer" at all - in the "Select an app to open this file" dialog
+# and in Settings > Apps > Default apps.  Without it the app is reachable
+# only through "Choose an app on your PC", browsing to the .exe by hand,
+# because that dialog is built from RegisteredApplications rather than from
+# the Applications\<exe> entry above.
+$capRoot = "HKCU:\Software\GCSViewer"
+New-Item -Path "$capRoot\Capabilities\FileAssociations" -Force | Out-Null
+Set-ItemProperty "$capRoot\Capabilities" "ApplicationName"        "GCS Viewer"
+Set-ItemProperty "$capRoot\Capabilities" "ApplicationDescription" `
+    "View Gemcut Studio .gcs and GemCad .gem faceting designs - three shaded views and the cutting instructions."
+Set-ItemProperty "$capRoot\Capabilities" "ApplicationIcon"        "`"$launcher`",0"
+foreach ($ext in @('.gcs', '.gem')) {
+    Set-ItemProperty "$capRoot\Capabilities\FileAssociations" $ext $progId
+}
+New-Item -Path "HKCU:\Software\RegisteredApplications" -Force | Out-Null
+Set-ItemProperty "HKCU:\Software\RegisteredApplications" "GCS Viewer" `
+    "Software\GCSViewer\Capabilities"
+
 # Start Menu shortcut - Windows 11's "Open with" list is built from registered apps
 $lnk = Join-Path ([Environment]::GetFolderPath('Programs')) "GCS Viewer.lnk"
 $ws = New-Object -ComObject WScript.Shell
@@ -68,12 +87,19 @@ $sig = '[DllImport("shell32.dll")] public static extern void SHChangeNotify(int 
 (Add-Type -MemberDefinition $sig -Name Shell -Namespace Win32 -PassThru)::SHChangeNotify(0x08000000,0,[IntPtr]::Zero,[IntPtr]::Zero)
 
 Write-Host ""
-Write-Host "Done. To finish (one time), set the default for .gcs AND .gem:" -ForegroundColor Green
-Write-Host "  Right-click a .gcs (and a .gem) file > Open with > Choose another app."
-Write-Host "  Pick 'GCS Viewer'. If it isn't listed, scroll down and click"
-Write-Host "  'Choose an app on your PC' (older Windows: 'More apps' >"
-Write-Host "  'Look for another app on this PC'), then browse to:"
+Write-Host "Registered. Windows does not allow a program to make itself the" -ForegroundColor Green
+Write-Host "default for a file type, so finish it by hand - once for .gcs and" -ForegroundColor Green
+Write-Host "once for .gem, which Windows tracks separately." -ForegroundColor Green
+Write-Host ""
+Write-Host "  Settings > Apps > Default apps"
+Write-Host "  In 'Set a default for a file type or link type', type   .gcs"
+Write-Host "  Click the .gcs row, choose 'GCS Viewer', click 'Set default'."
+Write-Host "  Then do the same for   .gem"
+Write-Host ""
+Write-Host "Or from a file: right-click a .gcs > Open with > Choose another app,"
+Write-Host "click 'GCS Viewer', then click 'Always'.  ('Always' only appears once"
+Write-Host "an app is selected.)  If GCS Viewer is not listed at all, scroll to"
+Write-Host "the bottom and use 'Choose an app on your PC', then browse to:"
 Write-Host "      $launcher"
-Write-Host "  Tick 'Always use this app', click OK."
 Write-Host ""
 Write-Host "After that, double-clicking a .gcs or .gem opens the viewer."

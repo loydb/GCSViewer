@@ -15,6 +15,10 @@ $appKey  = "GCSViewer.exe"
 
 Remove-Item "$classes\$progId" -Recurse -Force
 Remove-Item "$classes\Applications\$appKey" -Recurse -Force
+# the Default Programs registration that puts it in the Open-with dialog and
+# in Settings > Default apps
+Remove-ItemProperty "HKCU:\Software\RegisteredApplications" -Name "GCS Viewer"
+Remove-Item "HKCU:\Software\GCSViewer" -Recurse -Force
 Remove-Item (Join-Path ([Environment]::GetFolderPath('Programs')) "GCS Viewer.lnk") -Force
 
 foreach ($ext in @('.gcs', '.gem')) {
