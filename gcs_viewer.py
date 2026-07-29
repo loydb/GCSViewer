@@ -37,7 +37,7 @@ from PIL import Image, ImageDraw, ImageFont
 # that disagrees with this.  A viewer handed out as a bare .exe has no other
 # way to answer "which build is this?" - and this project has already shipped
 # a binary four weeks behind its own source once.
-__version__ = "1.0.11"
+__version__ = "1.0.12"
 
 # ----------------------------------------------------------------------------
 # Parsing
@@ -368,7 +368,18 @@ def write_gcs(path, facets, info, material, gear=96):
     i = 0
     for run_len in boundaries:
         tier = facets[i].get("tier", "") or ""
-        instr = facets[i].get("instr", "") or ""
+        # Every distinct step in the tier, not just the one the tier opens
+        # with.  A .gem puts the instruction on the facet that *begins* a
+        # cutting step and a tier can hold several, so taking facets[i] alone
+        # dropped later steps on conversion - 332 of the .gem files in the
+        # reference collection lost at least one.  Repeats collapse, so a
+        # .gcs (one instruction repeated across its tier) is unchanged.
+        steps = []
+        for f in facets[i:i + run_len]:
+            s = (f.get("instr", "") or "").strip()
+            if s and s not in steps:
+                steps.append(s)
+        instr = " · ".join(steps)
         # Tier angle/depth tell Gem Cut Studio which section a tier belongs to:
         #   angle > 90 -> Pavilion (normal points down), < 90 -> Crown,
         #   == 90 -> Girdle, 0 -> Table.  angle = arccos(nz); depth = |v . n|.

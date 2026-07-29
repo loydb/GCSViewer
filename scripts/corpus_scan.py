@@ -176,11 +176,15 @@ def roundtrip(path, tmpdir):
             out.append([s for s in dict.fromkeys(ins) if s])
         return out
 
+    # A tier holding several steps is written as one string joining them, so
+    # a step counts as carried when its text survives *inside* what came
+    # back, not only when it is a separate entry.  Comparing for equality
+    # reported the joined form as a loss, which is the opposite of the truth.
     a_steps, b_steps = steps(facets), steps(back)
     dropped = 0
     if len(a_steps) == len(b_steps):
         for xs, ys in zip(a_steps, b_steps):
-            dropped += len([s for s in xs if s not in ys])
+            dropped += len([s for s in xs if not any(s in y for y in ys)])
 
     row["worst_vertex"] = "%.3g" % wv
     row["worst_normal"] = "%.3g" % wn

@@ -5,6 +5,21 @@ Every release is built, self-tested and published by
 publish a tag that disagrees with `__version__` and refuses to ship an
 executable whose frozen code does not match the committed source.
 
+## 1.0.12
+
+- **Converting a `.gem` no longer drops cutting steps.** `write_gcs` wrote the
+  instruction the tier opens with and discarded the rest; 332 of the `.gem`
+  files in the reference collection lost at least one. It now joins the
+  distinct steps into the single string the format allows, the same way the
+  table displays them.
+
+  This had been left as the owner's call, on the grounds that ~29 solver
+  scripts import `write_gcs` and a longer instruction string might break
+  something that matches on the text. Measuring it settled it: of 92 scripts
+  that touch that tree, exactly one reads the converted `.gcs` output — the
+  converter itself — and none reads instructions from it. Every other script
+  reads the `.gem` originals directly, as a geometry oracle.
+
 ## 1.0.11
 
 - The designer's notes carried in a `.gem` are printed along the foot of the

@@ -223,7 +223,7 @@ background, leaving a crown floating with no stone under it.
 ## Tests
 
 ```bash
-python test_gcs_viewer.py     # 161 checks
+python test_gcs_viewer.py     # 164 checks
 ```
 
 No fixtures on disk and no third-party design files: every stone is
@@ -245,9 +245,9 @@ That is not a guess. Run:
 python scripts/mutation_check.py
 ```
 
-It reintroduces eighteen deliberate defects one at a time — dropping the `.gem`
+It reintroduces nineteen deliberate defects one at a time — dropping the `.gem`
 Y mirror, painting nearest-first, ignoring the gear, losing the instruction
-text — and reports which checks catch each one. Currently **18 of 18**. The
+text — and reports which checks catch each one. Currently **19 of 19**. The
 first run of this harness found three that survived, which is how the culling
 and paint-order scenes came to exist.
 
@@ -282,11 +282,11 @@ the synthetic suite could not, all now fixed:
 - **Zero-byte files reported "no element found: line 1, column 0."** Twelve of
   them sit in the collection. They are still unreadable, but now they say so.
 
-One limitation is left standing rather than papered over. `write_gcs` writes
-one instruction per tier — the format has nowhere else to put it — so
-converting a `.gem` whose tier holds several cutting steps keeps only the
-first. That affects 332 of the collection's `.gem` files. The viewer itself
-shows every step; it is the conversion that cannot carry them.
+That last one had a second half. `write_gcs` writes one instruction per tier,
+because the format has nowhere else to put it, so converting a `.gem` whose
+tier holds several steps kept only the first — 332 files. It now joins them
+into that one string, the same way the table displays them, and the
+conversion loses nothing.
 
 What the sweep did not find matters too: across those files there are no other
 parse failures, no malformed geometry, and every design round-trips through

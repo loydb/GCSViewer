@@ -376,6 +376,29 @@ def test_write_gcs_same_named_tiers(tmp):
     plain = [{k: v for k, v in f.items() if k != "tid"} for f in facets]
     q = os.path.join(tmp, "notid.gcs")
     gv.write_gcs(q, plain, {"title": "No Tid"}, {"color": (.5, .5, .5)})
+    # a tier holding several cutting steps must carry all of them out again;
+    # this is the .gem shape, where only the facet that opens a step has text
+    multi = [dict(f) for f in cone_facets(8, 43.0, tier="P1", instr="")]
+    multi[0]["instr"] = "Cut to a center point"
+    multi[4]["instr"] = "Meet 1.g1.1"
+    m = os.path.join(tmp, "multistep.gcs")
+    gv.write_gcs(m, multi, {"title": "Multi"}, {"color": (.5, .5, .5)})
+    written = [t.get("instructions") for t in ET.parse(m).iter("tier")]
+    check("multi-step tiers: every step is carried into the .gcs",
+          written == ["Cut to a center point · Meet 1.g1.1"], written)
+    back_m, _, _ = gv.parse_gcs(m)
+    check("multi-step tiers: and survive being read back",
+          "Meet 1.g1.1" in back_m[0]["instr"], back_m[0]["instr"])
+
+    single = [dict(f, instr="Cut to a center point")
+              for f in cone_facets(8, 43.0, tier="P1")]
+    s1 = os.path.join(tmp, "single.gcs")
+    gv.write_gcs(s1, single, {}, {"color": (.5, .5, .5)})
+    check("multi-step tiers: a repeated instruction is not duplicated",
+          [t.get("instructions") for t in ET.parse(s1).iter("tier")] ==
+          ["Cut to a center point"],
+          [t.get("instructions") for t in ET.parse(s1).iter("tier")])
+
     check("no-tid callers still group by name, unchanged",
           len(list(ET.parse(q).iter("tier"))) == 1,
           len(list(ET.parse(q).iter("tier"))))
