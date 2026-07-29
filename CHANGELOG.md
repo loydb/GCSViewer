@@ -1,0 +1,104 @@
+# Changelog
+
+Every release is built, self-tested and published by
+[the release workflow](.github/workflows/release.yml), which also refuses to
+publish a tag that disagrees with `__version__` and refuses to ship an
+executable whose frozen code does not match the committed source.
+
+## 1.0.11
+
+- The designer's notes carried in a `.gem` are printed along the foot of the
+  sheet. The reader had been extracting them since 2026-07-13 and nothing
+  displayed them, while the footer sat empty on exactly those files.
+
+## 1.0.10
+
+- The setup guide that ships inside both release zips brought back in line
+  with the program. It had said the single-file build is only slow on its
+  first launch; it unpacks itself on **every** launch, which is why the
+  folder build exists.
+
+## 1.0.9
+
+- Releases now carry a **folder build** as well as the single file. The
+  single file unpacks its whole contents into `%TEMP%` every time it runs —
+  1,534 ms to start, against 427 ms unpacked.
+- `--version` reaches a terminal. A `--windowed` build has no console of its
+  own, and CPython's `print()` returns silently when `sys.stdout` is `None`,
+  so it attaches to the parent process's console when there is one.
+
+## 1.0.8
+
+- The viewer reports its version — in the title bar and via `--version`,
+  along with whether it is the frozen executable or the source. Handed out as
+  a bare `.exe` there was no way to tell one build from another, which is how
+  a stale one goes unnoticed.
+
+## 1.0.7
+
+- Stepping between designs no longer re-lists the folder twice per keypress.
+  On a 996-design folder that was 52 ms per press, more than the parse and
+  render it wrapped; now 0.03 ms, and 2.4 ms cold.
+
+## 1.0.6
+
+- The cutting table is no longer redrawn on every frame of a drag. It was 40%
+  of a frame on an ordinary design and two thirds of one at 4,200 facets.
+  Drags are 1.5× faster typically, 3.2× on the heavy case.
+
+## 1.0.5
+
+- A panel with nothing facing it says so instead of showing black. A preform
+  has no crown, so its table view is legitimately empty — truthful, but
+  indistinguishable from a viewer that broke.
+- `scripts/render_audit.py`: measures how much of each panel is actually
+  drawn, because a crash-free render sweep will happily pass a stone drawn
+  inside out. Over 8,984 designs it found no inverted normals.
+
+## 1.0.4
+
+- **The copyright line is gone from rendered sheets.** Every sheet carried a
+  notice for the author of the viewer, including sheets of designs cut or
+  drawn by somebody else. The footer now shows only what the design file
+  itself states.
+
+## 1.0.3
+
+Three defects found by sweeping 10,249 real designs:
+
+- **A design whose title is not ASCII would not open at all.** Gem Cut Studio
+  writes the file in the machine's code page and declares no encoding, so
+  *Viet Gems 216 — Fleur en rêve* was rejected as malformed XML over one byte
+  in its title.
+- **`write_gcs` merged tiers that share a name.** Two `<tier>` elements may
+  carry the same name; one design was rewritten from nine tiers to one.
+  Boundaries now follow the element, and only where that splits a tier.
+- Zero-byte files said "no element found: line 1, column 0". They now say the
+  file is empty.
+
+## 1.0.2
+
+- **Cutting steps were being dropped.** In a `.gem` the instruction belongs to
+  the facet that *begins* a step and a tier can hold several — 144 lines lost
+  across 56 of the 245 `.gem` files in the reference collection.
+- `scripts/corpus_scan.py`: parses every design under a folder, optionally
+  rendering a sample and round-tripping each file through `write_gcs`.
+
+## 1.0.1
+
+- An icon, drawn by the renderer itself, compiled into the executable and
+  registered for `.gcs` and `.gem` documents — a file-type handler with no
+  icon leaves Explorer showing a blank page for every design in the folder,
+  which is most of what this tool exists to fix.
+
+## 1.0.0
+
+First public release. Three shaded views and the cutting sequence from a
+`.gcs` or `.gem` file, on a double-click.
+
+Published with the apparatus the project had never had: a 100-plus check
+suite that synthesises its own `.gem` binaries from an independent encoder, a
+mutation harness that proves those checks can fail, and a tool that diffs the
+code frozen inside a PyInstaller executable against the current source —
+written because the executable in this project's history was four weeks
+behind the `.py` it was supposedly built from.

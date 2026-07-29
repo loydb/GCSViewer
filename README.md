@@ -303,6 +303,12 @@ changes here are additive: new optional parameters, never a changed signature
 or a changed meaning. The parser checks in `test_gcs_viewer.py` are the
 contract.
 
+## History
+
+[CHANGELOG.md](CHANGELOG.md) — what changed in each release and why. Several
+entries are defects this repository's own verification tooling found in files
+that had been sitting on disk for years.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
