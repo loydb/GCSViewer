@@ -120,6 +120,9 @@ current user only.
 - **R** — reset the 3/4 angle.
 - **Esc** or **Q** — close.
 
+Launching **GCS Viewer** from the Start Menu without a design asks which one
+to open.
+
 A panel that reads **"no facets face this view"** is not a fault. A preform —
 a stone with the girdle and pavilion cut but no crown yet — has nothing at all
 facing the table view, so there is genuinely nothing to draw.

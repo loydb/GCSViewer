@@ -1076,6 +1076,46 @@ def test_version():
           isinstance(got, bool), repr(got))
 
 
+def test_no_argument_launch(tmp):
+    """The installer puts a shortcut in the Start Menu, which launches the
+    viewer with no file named.  That used to print usage to a console a
+    windowed build does not have and exit 2 - a Start Menu entry that did
+    nothing."""
+    os.environ["GCS_VIEWER_NO_GUI"] = "1"
+    try:
+        rc = gv.main(["gcs_viewer.py"])
+    finally:
+        del os.environ["GCS_VIEWER_NO_GUI"]
+    check("no-argument: scripted callers still get usage and exit 2",
+          rc == 2, rc)
+
+    # The picker only runs with the dialogs enabled, so _error_window is
+    # replaced for the rest of this test: any slip that reaches an error path
+    # would otherwise open a modal box and wait for an OK nobody will click.
+    asked = []
+    real_ask, real_err = gv._ask_for_design, gv._error_window
+    gv._error_window = lambda msg: None
+    try:
+        gv._ask_for_design = lambda: (asked.append(1), "")[1]
+        rc = gv.main(["gcs_viewer.py"])
+        check("no-argument: a person is asked which design to open",
+              len(asked) == 1, asked)
+        check("no-argument: cancelling the dialog exits quietly", rc == 0, rc)
+
+        # picked, then saved - the file it writes must be the one chosen,
+        # since no path was given on the command line to write beside
+        src = os.path.join(tmp, "synthetic.gcs")
+        expected = os.path.splitext(src)[0] + "_views.png"
+        if os.path.exists(expected):
+            os.remove(expected)
+        gv._ask_for_design = lambda: src
+        rc = gv.main(["gcs_viewer.py", "--save"])
+        check("no-argument: the chosen design is the one that opens",
+              rc == 0 and os.path.exists(expected), rc)
+    finally:
+        gv._ask_for_design, gv._error_window = real_ask, real_err
+
+
 def test_selftest(tmp):
     """The frozen exe runs exactly this to prove its bundle is complete."""
     report = os.path.join(tmp, "selftest.txt")
@@ -1113,6 +1153,7 @@ def main():
         test_instruction_cache()
         test_save_cli(tmp)
         test_version()
+        test_no_argument_launch(tmp)
         test_selftest(tmp)
 
     print("\n%d checks passed, %d failed" % (PASS, len(FAIL)))

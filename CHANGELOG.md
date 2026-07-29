@@ -5,6 +5,16 @@ Every release is built, self-tested and published by
 publish a tag that disagrees with `__version__` and refuses to ship an
 executable whose frozen code does not match the committed source.
 
+## 1.0.14
+
+- **The Start Menu shortcut did nothing.** The installer creates one —
+  Windows 11 builds its Open-With list from registered applications, so it
+  has to — and clicking it launched the viewer with no file named, which
+  printed usage to a console a windowed build does not have and exited 2.
+  Launching without a file now asks which design to open. Scripted callers
+  keep the old contract: with `GCS_VIEWER_NO_GUI` set it still prints usage
+  and exits 2.
+
 ## 1.0.13
 
 - `test_gui.py`: 26 checks on the part of the program a user actually

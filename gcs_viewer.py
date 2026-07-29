@@ -37,7 +37,7 @@ from PIL import Image, ImageDraw, ImageFont
 # that disagrees with this.  A viewer handed out as a bare .exe has no other
 # way to answer "which build is this?" - and this project has already shipped
 # a binary four weeks behind its own source once.
-__version__ = "1.0.13"
+__version__ = "1.0.14"
 
 # ----------------------------------------------------------------------------
 # Parsing
@@ -1172,6 +1172,34 @@ def _error_window(msg):
         print(msg, file=sys.stderr)
 
 
+def _ask_for_design():
+    """Ask which design to open, for a launch that named no file.
+
+    The installer puts a "GCS Viewer" shortcut in the Start Menu - it has to,
+    or Windows 11's Open-With list will not offer the program - and clicking
+    it runs the viewer with no arguments.  That printed usage to a console a
+    --windowed build does not have and exited 2: from the user's side, a
+    Start Menu entry that does nothing at all.
+
+    Returns "" if the dialog is cancelled or cannot be opened.
+    """
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+        r = tk.Tk()
+        r.withdraw()
+        path = filedialog.askopenfilename(
+            title="Open a faceting design",
+            filetypes=[("Faceting designs", "*.gcs *.gem"),
+                       ("Gemcut Studio", "*.gcs"),
+                       ("GemCad", "*.gem"),
+                       ("All files", "*.*")])
+        r.destroy()
+        return path or ""
+    except Exception:
+        return ""
+
+
 def _selftest(report_path=None):
     """Render a stone built in memory and write it out as a PNG.
 
@@ -1268,8 +1296,16 @@ def main(argv):
         return _selftest(args[0] if args else None)
 
     if not args:
-        print(__doc__)
-        return 2
+        # Scripted callers keep the old contract: usage on stdout, exit 2.
+        # A person who launched it from the Start Menu gets a file picker
+        # rather than silence.
+        if os.environ.get("GCS_VIEWER_NO_GUI"):
+            print(__doc__)
+            return 2
+        chosen = _ask_for_design()
+        if not chosen:
+            return 0
+        args = [chosen]
 
     path = args[0]
     if not os.path.isfile(path):
