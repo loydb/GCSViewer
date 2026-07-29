@@ -251,9 +251,15 @@ the synthetic suite could not, all now fixed:
 - **Zero-byte files reported "no element found: line 1, column 0."** Twelve of
   them sit in the collection. They are still unreadable, but now they say so.
 
-What it did not find matters too: across those files there are no other parse
-failures, no malformed geometry, and every one of them round-trips through
-`write_gcs` with **vertices bit-exact**. Thirteen designs contain facets with
+One limitation is left standing rather than papered over. `write_gcs` writes
+one instruction per tier — the format has nowhere else to put it — so
+converting a `.gem` whose tier holds several cutting steps keeps only the
+first. That affects 332 of the collection's `.gem` files. The viewer itself
+shows every step; it is the conversion that cannot carry them.
+
+What the sweep did not find matters too: across those files there are no other
+parse failures, no malformed geometry, and every design round-trips through
+`write_gcs` with **vertices bit-exact and no tier lost**. Thirteen designs contain facets with
 no area, which is a property of those designs rather than a fault in reading
 them. A 150-design render sample completed without a failure.
 
