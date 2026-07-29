@@ -542,6 +542,21 @@ def render_view(facets, basis, scale, color, size=620, ss=2,
 PANEL_LABELS = ("Table (top)", "Side", "3/4 view")
 
 
+def _footer_text(info):
+    """The line under the sheet: what the file itself says about the design.
+
+    It carries no copyright notice.  The viewer does not own what it draws -
+    a rendered sheet belongs to whoever cut or designed the stone - so it
+    puts nothing of its own on the page.  A file that states none of these
+    gets no footer at all rather than an empty rule.
+    """
+    parts = [(info or {}).get("shape", ""), (info or {}).get("date", "")]
+    ri_min, ri_max = (info or {}).get("ri_min"), (info or {}).get("ri_max")
+    if ri_min and ri_max:
+        parts.append("RI %s-%s" % (ri_min, ri_max))
+    return "   |   ".join(str(p) for p in parts if p)
+
+
 def make_panels(facets, scale, color, angles34, size, ss, gray, labels):
     bases = [view_basis(0, 90), view_basis(0, 0), view_basis(*angles34)]
     return [render_view(facets, b, scale, color, size=size, ss=ss,
@@ -727,14 +742,10 @@ def compose(panels, info, src_name, panel, instr_img=None,
                fill=(205, 205, 210), font=label_font)
         canvas.paste(instr_img, (pad, instr_top))
 
-    ri = info.get("ri_min")
-    parts = ["Copyright 2026 Loyd Blankenship",
-             info.get("shape", ""), info.get("date", "")]
-    if ri and info.get("ri_max"):
-        parts.append(f"RI {info['ri_min']}-{info['ri_max']}")
-    parts = [p for p in parts if p]
-    d.text((pad, H - footer + 4), "   |   ".join(parts), fill=(165, 165, 170),
-           font=small_font)
+    text = _footer_text(info)
+    if text:
+        d.text((pad, H - footer + 4), text, fill=(165, 165, 170),
+               font=small_font)
     return canvas
 
 

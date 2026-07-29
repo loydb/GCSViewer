@@ -768,6 +768,30 @@ def test_depth_order_and_culling():
           int(np.abs(got - want_far).max()) > 8, (got, want_far))
 
 
+def test_footer():
+    """The sheet carries no copyright line.  The viewer does not own what it
+    draws, and it renders other people's designs as readily as your own."""
+    text = gv._footer_text({"shape": "Round", "date": "2026-07-28",
+                            "ri_min": "1.54", "ri_max": "1.55",
+                            "title": "Someone Else's Stone",
+                            "author": "Someone Else"})
+    check("footer: no copyright notice", "copyright" not in text.lower(), text)
+    check("footer: no name of the tool's author",
+          "blankenship" not in text.lower(), text)
+    check("footer: carries what the file says",
+          "Round" in text and "2026-07-28" in text and "RI 1.54-1.55" in text,
+          text)
+    check("footer: a file that says nothing gets no footer",
+          gv._footer_text({}) == "" and gv._footer_text(None) == "",
+          repr(gv._footer_text({})))
+    check("footer: a partial file gets only what it has",
+          gv._footer_text({"shape": "Oval"}) == "Oval",
+          gv._footer_text({"shape": "Oval"}))
+    check("footer: a half-stated RI is not printed",
+          gv._footer_text({"ri_min": "1.54"}) == "",
+          gv._footer_text({"ri_min": "1.54"}))
+
+
 def test_compose():
     facets = synthetic_stone()
     scale = gv.world_scale(facets)
@@ -874,6 +898,7 @@ def main():
         test_view_basis()
         test_render()
         test_depth_order_and_culling()
+        test_footer()
         test_compose()
         test_save_cli(tmp)
         test_selftest(tmp)

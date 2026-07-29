@@ -23,6 +23,9 @@ import tempfile
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 MUTATIONS = [
+    ("put a copyright line back on the sheet",
+     'parts = [(info or {}).get("shape", ""), (info or {}).get("date", "")]',
+     'parts = ["Copyright 2026", (info or {}).get("shape", "")]'),
     ("give up on a .gcs that is not valid UTF-8",
      'for enc in ("utf-8-sig", "cp1252", "latin-1"):',
      'for enc in ():'),
