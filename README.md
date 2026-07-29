@@ -185,12 +185,17 @@ on a `.gem` file.
 > `Install-GcsViewer.ps1` has not been run from the folder holding that
 > `GCSViewer.exe`.
 
-If double-click still shows the picker after you have set the default, the
-registration is fine and Explorer's association cache is stale — it caches for
-the life of its session and outlives the registry. Sign out, or reboot. The
-test that tells them apart: run `Start-Process "stone.gcs"` from PowerShell,
-which resolves the registry directly. If that opens the viewer while Explorer
-prompts, it is the cache.
+If double-click shows the picker and choosing the viewer does nothing,
+**re-run `Install-GcsViewer.ps1`**. Versions 1.0.19 to 1.0.25 registered the
+file type without naming a default action, so Explorer had nothing to invoke —
+the icon resolved, Settings showed the right default, and the double-click
+could not proceed. Re-running repairs it.
+
+That one cost an evening, and the reason it was so hard to see is worth
+recording: `Start-Process "stone.gcs"` from PowerShell worked the whole time.
+A double-click and a `ShellExecute` from an ordinary process take different
+paths through the association, and only one of them needs the default verb. A
+test that launches the file is not a test that double-click works.
 
 Setting the viewer as the default does not remove anything else. Gem Cut
 Studio, or whatever else you have, stays available on both file types through
@@ -365,7 +370,7 @@ background, leaving a crown floating with no stone under it.
 ## Tests
 
 ```bash
-python test_gcs_viewer.py     # 180 checks
+python test_gcs_viewer.py     # 197 checks
 python test_gui.py            # 37 checks, the window itself
 ```
 

@@ -1198,6 +1198,66 @@ def test_install_target(tmp):
           build_exe.is_folder_build(onefile) is False)
 
 
+def test_installer():
+    """The installer is shipped in both zips and had no checks at all.
+
+    It cost an evening to find out why: the ProgId's `shell` key had no
+    default value, so nothing declared which verb a double-click should
+    invoke. The file type resolved, the icon appeared, the command was right,
+    Settings showed the correct default - and Explorer prompted on every
+    double-click, then failed to act on the answer. `Start-Process` worked
+    throughout, which is what kept the fault hidden.
+
+    These assertions are that knowledge written down. They read the script
+    rather than run it, because running it rewrites the association of
+    whatever machine the suite is on.
+    """
+    here = os.path.dirname(os.path.abspath(__file__))
+    with open(os.path.join(here, "Install-GcsViewer.ps1"), encoding="utf-8") as fh:
+        ps = fh.read()
+
+    # the defect that started it: a document type needs a default verb
+    check("installer: names the default verb on the ProgId's shell key",
+          '"$classes\\$progId\\shell"' in ps and '"open"' in ps, "missing")
+
+    for what, needle in (
+        ("the open command", '$classes\\$progId\\shell\\open\\command'),
+        ("a document icon", '$classes\\$progId\\DefaultIcon'),
+        ("an Applications entry", '$classes\\Applications\\$appKey'),
+        ("a friendly app name", "FriendlyAppName"),
+        ("SupportedTypes", "SupportedTypes"),
+        ("the Default Programs capabilities", "Capabilities"),
+        ("RegisteredApplications", "RegisteredApplications"),
+    ):
+        check("installer: writes %s" % what, needle in ps, needle)
+
+    check("installer: registers both extensions",
+          "'.gcs', '.gem'" in ps or '".gcs", ".gem"' in ps, "extension loop")
+
+    # 1.0.19-1.0.25 wrote a ProgId\Application subkey, which made the ProgId
+    # claim to be an application; Explorer then stopped honouring it as a
+    # document type.  It must be removed, never written.
+    writes_app = 'Set-ItemProperty "$classes\\$progId\\Application"' in ps
+    repairs_app = 'Remove-Item "$classes\\$progId\\Application"' in ps
+    check("installer: does not declare the ProgId to be an application",
+          not writes_app, "it writes ProgId\\Application again")
+    check("installer: repairs that key if an older version wrote it",
+          repairs_app, "no repair present")
+
+    check("installer: refuses to run without the exe beside it",
+          "was not found next to this script" in ps, "no guard")
+    check("installer: warns when the copy has moved since it was registered",
+          "moved since it was last registered" in ps, "no move warning")
+
+    with open(os.path.join(here, "Uninstall-GcsViewer.ps1"), encoding="utf-8") as fh:
+        un = fh.read()
+    for what, needle in (("the ProgId", "$classes\\$progId"),
+                         ("the Applications entry", "Applications\\$appKey"),
+                         ("the capabilities", "RegisteredApplications"),
+                         ("the Start Menu shortcut", "GCS Viewer.lnk")):
+        check("uninstaller: removes %s" % what, needle in un, needle)
+
+
 def test_selftest(tmp):
     """The frozen exe runs exactly this to prove its bundle is complete."""
     report = os.path.join(tmp, "selftest.txt")
@@ -1237,6 +1297,7 @@ def main():
         test_save_cli(tmp)
         test_version()
         test_no_argument_launch(tmp)
+        test_installer()
         test_install_target(tmp)
         test_selftest(tmp)
 

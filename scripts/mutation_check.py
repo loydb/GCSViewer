@@ -169,6 +169,13 @@ def main():
         h = os.path.join(HERE, "scripts", helper)
         if os.path.exists(h):
             shutil.copy2(h, os.path.join(tmp, "scripts"))
+    # the installer scripts are read by the suite too - it asserts the
+    # registrations they must write, including the default verb whose absence
+    # broke double-click for five releases
+    for ps in ("Install-GcsViewer.ps1", "Uninstall-GcsViewer.ps1"):
+        h = os.path.join(HERE, ps)
+        if os.path.exists(h):
+            shutil.copy2(h, tmp)
     target = os.path.join(tmp, "gcs_viewer.py")
 
     shutil.copy2(src, target)

@@ -27,8 +27,12 @@ $cmd = "`"$launcher`" `"%1`""
 # Document type (ProgId)
 New-Item -Path "$classes\$progId\shell\open\command" -Force | Out-Null
 Set-ItemProperty "$classes\$progId"                    "(default)" "Gemcut Studio Stone (Viewer)"
-Set-ItemProperty "$classes\$progId\shell\open"         "(default)" "View gem"
 Set-ItemProperty "$classes\$progId\shell\open\command" "(default)" $cmd
+# Name the default verb.  Without this the "shell" key has no default value,
+# so nothing declares which verb a double-click should invoke - the file type
+# resolves, the icon appears, and there is no default action to run.  Every
+# working document type on this machine sets it; ours had not.
+Set-ItemProperty "$classes\$progId\shell"              "(default)" "open"
 
 # Icon for .gcs / .gem documents in Explorer - index 0 is the icon compiled
 # into the exe, so there is no separate .ico file to keep alongside it
@@ -47,6 +51,22 @@ Set-ItemProperty "$classes\$progId\DefaultIcon"        "(default)" "`"$launcher`
 # ran one of those versions.
 Remove-Item "$classes\$progId\Application" -Recurse -Force -ErrorAction SilentlyContinue
 Remove-ItemProperty "$classes\$progId" -Name "FriendlyTypeName" -ErrorAction SilentlyContinue
+Remove-ItemProperty "$classes\$progId\shell\open" -Name "(default)" -ErrorAction SilentlyContinue
+
+# REPAIR: the shell remembers app display names per executable *path*, so a
+# copy that has been moved leaves an entry naming a file that is gone.  Those
+# stale names can surface as a second, dead row in the open-with dialog.
+$mui = "$classes\Local Settings\Software\Microsoft\Windows\Shell\MuiCache"
+if (Test-Path $mui) {
+    $props = (Get-Item $mui).GetValueNames() | Where-Object { $_ -like "*$appKey.*" }
+    foreach ($v in $props) {
+        $target = $v -replace '\.(FriendlyAppName|ApplicationCompany|ApplicationDescription)$',''
+        if ($target -and -not (Test-Path -LiteralPath $target)) {
+            Remove-ItemProperty $mui -Name $v -ErrorAction SilentlyContinue
+            Write-Host "  cleared a stale shell entry for $target"
+        }
+    }
+}
 
 # Named application that appears in the "Open with" list
 New-Item -Path "$classes\Applications\$appKey\shell\open\command" -Force | Out-Null

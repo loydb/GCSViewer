@@ -20,14 +20,29 @@ executable whose frozen code does not match the committed source.
   picker via the `Applications` entry, and it did not appear in Settings →
   Default apps at all.
 
+## 1.0.26
+
+- **Fixed: double-clicking a design opened the "Select an app" dialog, and
+  choosing the viewer did nothing.** The ProgId's `shell` key carried no
+  default value, so nothing declared which verb a double-click invokes. The
+  file type resolved, the icon appeared, the command was correct and Settings
+  showed the right default — and Explorer had no action to run. Introduced in
+  1.0.19; **re-run `Install-GcsViewer.ps1` to repair it.**
+- The installer also removes the `ProgId\Application` subkey that 1.0.19–1.0.25
+  wrote. Declaring the document type to be an application made Windows list
+  the program twice in the open-with dialog and stop honouring it as a handler.
+- It clears shell display-name entries left behind for executable paths that no
+  longer exist, which showed up as a second, dead row in that dialog.
+- The installer now has tests — 17 of them. It is shipped in both zips and had
+  none, which is why a missing default verb reached five releases.
+- Corrected the 1.0.25 note below: the cause was not Explorer's cache.
+
 ## 1.0.25
 
-- Documented the failure this project spent an evening on: Explorer caches
-  file associations for the life of its session, so a correct registration can
-  still produce the "Select an app to open this file" prompt. Includes the
-  test that distinguishes it — the same file launched from PowerShell resolves
-  the registry directly, so if that opens the viewer while Explorer prompts,
-  only the cache is stale.
+- Documented a diagnosis that turned out to be **wrong** — see 1.0.26 for the
+  actual cause, a missing default verb. Kept here rather than rewritten
+  because the reasoning is instructive: every registry key checked out, so I
+  blamed a cache, and a reboot disproved it.
 - Also documented why the program can appear twice in that list, and that a
   saved default does not survive the program being moved.
 
