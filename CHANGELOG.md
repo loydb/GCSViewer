@@ -7,78 +7,61 @@ executable whose frozen code does not match the committed source.
 
 ## 1.0.29
 
-- Documentation only. README and INSTALL.md cut roughly in half — the
-  post-mortems, timings and rationale that had accumulated in them belong in
-  this file, not in the page somebody reads to find out what the program does.
+- Documentation only. README and INSTALL.md cut roughly in half; the reference
+  material is unchanged. Entries in this file rewritten as release notes, and a
+  duplicated 1.0.26 heading merged.
 
 ## 1.0.28
 
-- `scripts/Show-OpenWithList.ps1` now answers the question that actually
-  matters. It reported what Windows *offers* in the open-with list, which was
-  green throughout the evening double-click was broken. It now also walks the
-  launch chain — effective ProgId, its default verb, that verb's command, and
-  whether the program exists — and names the exact link that is missing. A
-  file type with no default verb is reported in the words that would have
-  saved hours: *Explorer will show the picker and picking the app will do
-  nothing.*
-- It also finds stale shell display names, the fifth hiding place for a ghost
-  entry and the one found only after the other four were clear. Scoped to this
-  program on purpose: unscoped it matched 475 rows from every app the machine
-  had ever uninstalled, and printing a delete command for each would invite
-  clearing unrelated programs' entries to fix ours.
+- `scripts/Show-OpenWithList.ps1` now checks whether a double-click resolves to
+  a program that exists, not only whether the viewer appears in the open-with
+  list. It walks the chain the shell walks — effective ProgId, its default verb,
+  that verb's command, the program itself — and names the missing link. A file
+  type with no default verb is reported as such, with the instruction to re-run
+  the installer.
+- It also reports stale shell display names, which a moved or uninstalled
+  program leaves behind and which surface as a dead row in the picker. Scoped to
+  this program's executables: unscoped it matched 475 entries from unrelated
+  applications.
 
 ## 1.0.27
 
-- The installer is now tested by **running** it, not only by reading it:
-  `scripts/test_installer.ps1` installs against a throwaway ProgId,
-  extension, app name and shortcut, reads all 22 registrations back out of
-  the registry, then runs the uninstaller and checks every one is gone. It
-  touches no real association and cleans up even if a check throws. Verified
-  it can fail: deleting the default-verb line makes it report
-  `the ProgId's shell key names a default verb ... got ''`.
-- CI runs it on the Windows jobs. The textual checks stay — they catch a
-  removed line on Linux too — but a registry read is what actually proves
-  Windows ends up with a working file type.
-
-## 1.0.26
-
-- **Removed the ProgId `Application` subkey added in 1.0.19, and repaired it on
-  upgrade.** It was written on the theory that Settings → Default apps needed
-  it. It did not help there, and it cost two things: the program appeared
-  **twice** in the open-with dialog (once as the document type pretending to
-  be an app, once as the real `Applications\GCSViewer.exe` entry), and
-  Explorer stopped honouring the class association it had accepted for weeks —
-  prompting on every double-click instead of opening. Re-running the installer
-  now deletes the subkey, so it repairs a machine that ran 1.0.19–1.0.25.
-- Corrected the README's claim that the `Capabilities` registration is what
-  makes the program appear in the picker and in Settings. It appears in the
-  picker via the `Applications` entry, and it did not appear in Settings →
-  Default apps at all.
+- `scripts/test_installer.ps1` runs the installer against a throwaway ProgId,
+  extension and app name, reads all 22 registrations back out of the registry,
+  then runs the uninstaller and checks every one is gone. No real association is
+  touched, and it cleans up even if a check throws. CI runs it on the Windows
+  jobs.
+- The textual installer checks stay, since they catch a deleted line on Linux
+  too, but only a registry read proves the file type actually works.
 
 ## 1.0.26
 
 - **Fixed: double-clicking a design opened the "Select an app" dialog, and
-  choosing the viewer did nothing.** The ProgId's `shell` key carried no
-  default value, so nothing declared which verb a double-click invokes. The
-  file type resolved, the icon appeared, the command was correct and Settings
-  showed the right default — and Explorer had no action to run. Introduced in
-  1.0.19; **re-run `Install-GcsViewer.ps1` to repair it.**
-- The installer also removes the `ProgId\Application` subkey that 1.0.19–1.0.25
-  wrote. Declaring the document type to be an application made Windows list
-  the program twice in the open-with dialog and stop honouring it as a handler.
-- It clears shell display-name entries left behind for executable paths that no
-  longer exist, which showed up as a second, dead row in that dialog.
-- The installer now has tests — 17 of them. It is shipped in both zips and had
-  none, which is why a missing default verb reached five releases.
-- Corrected the 1.0.25 note below: the cause was not Explorer's cache.
+  choosing the viewer did nothing.** The ProgId's `shell` key had no default
+  value, so nothing declared which verb a double-click invokes: the file type
+  resolved, the icon appeared, the command was correct, Settings showed the
+  right default, and Explorer had no action to run. Affects 1.0.19–1.0.25.
+  **Re-run `Install-GcsViewer.ps1` to repair it.**
+- **The installer removes the ProgId `Application` subkey that 1.0.19–1.0.25
+  wrote**, so re-running repairs a machine that ran one of those versions. It
+  was added on the theory that Settings → Default apps needed it; it did not
+  help there, and because it declares the document type to be an application it
+  listed the program twice in the open-with dialog and stopped Explorer
+  honouring the class association.
+- The installer clears shell display-name entries for executable paths that no
+  longer exist, which showed as a second, dead row in that dialog.
+- The installer has tests — 17, reading the script — where it previously had
+  none. That is how a missing default verb reached five releases.
+- Corrected two documentation claims: the `Capabilities` registration is not
+  what puts the program in the picker (the `Applications` entry is), and the
+  1.0.25 note below blamed the wrong cause.
 
 ## 1.0.25
 
-- Documented a diagnosis that turned out to be **wrong** — see 1.0.26 for the
-  actual cause, a missing default verb. Kept here rather than rewritten
-  because the reasoning is instructive: every registry key checked out, so I
-  blamed a cache, and a reboot disproved it.
-- Also documented why the program can appear twice in that list, and that a
+- Documented a diagnosis that was **wrong** — see 1.0.26 for the actual cause.
+  Left in place rather than deleted: every registry key was correct, which is
+  what made a cache look like the explanation, and a reboot disproved it.
+- Documented why the program can appear twice in the open-with list, and that a
   saved default does not survive the program being moved.
 
 ## 1.0.24
