@@ -4,27 +4,17 @@ gen_icon.py - draw the application icon with the application.
 
     python scripts/gen_icon.py
 
-Writes docs/gcsviewer.ico.  The icon is the demo stone rendered by the
-viewer's own renderer, at a low tilt so the silhouette keeps the pointed
-pavilion that reads as "gem" at 16 pixels.  Nothing is drawn by hand, so the
-icon cannot drift away from what the program actually produces.
+Writes docs/gcsviewer.ico from the demo stone, rendered by the viewer's own
+renderer so the icon cannot drift from what the program produces.
+build_exe.py compiles it in; Install-GcsViewer.ps1 points the document type
+at it.
 
-The renderer paints on a solid dark panel, which an icon must not have.  The
-alpha channel therefore comes from a second pass over the same geometry with
-the lighting model flattened to pure white - a coverage mask.  Keying the
-colour pass instead would delete the stone's own dark facets: a pavilion in
-shadow is only a few levels away from the background, so the bottom half of
-the gem would silently vanish and leave a floating crown.  The mask is
-Lanczos-downsampled like everything else, so partial coverage along the
-silhouette arrives as partial alpha.
-
-The colour pass uses the light= override to mix a headlight into the fixed
-light.  A 3/4 view lit only from the upper left leaves the pavilion nearly
-black, which is fine in a 460-pixel panel and unreadable at 16.
-
-build_exe.py picks the .ico up automatically; Install-GcsViewer.ps1 also
-points the .gcs/.gem document type at it, so Explorer shows the gem rather
-than a blank page.
+Two things here are not free choices.  Alpha comes from a second pass with
+the lighting flattened to white, not from keying the colour pass: a pavilion
+in shadow sits a few levels off the panel background, so keying would delete
+the bottom half of the stone.  And the colour pass mixes a headlight into the
+fixed light, because a 3/4 view lit only from the upper left is unreadable at
+16 pixels.
 """
 
 import os

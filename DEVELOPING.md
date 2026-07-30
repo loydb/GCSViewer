@@ -11,6 +11,43 @@ diagrams. They are a shared surface with a real dependent, so changes are
 additive: new optional parameters, never a changed signature or a changed
 meaning. The parser checks in `test_gcs_viewer.py` are the contract.
 
+## Build the exe
+
+```bash
+python scripts/build_exe.py --clean       # single file
+python scripts/build_exe.py --onedir      # folder build
+```
+
+Both shapes are attached to every release. The build then updates the copy
+Windows actually launches, reading that path out of the `.gcs` association
+rather than assuming it; `--no-install` skips that. It refuses to write a
+single-file exe over a folder install, or the reverse.
+
+An unsigned executable downloaded from the internet trips SmartScreen until it
+earns reputation: expect **More info → Run anyway** once.
+
+```bash
+python scripts/compare_exe_source.py GCSViewer.exe gcs_viewer.py
+```
+
+An exe carries its entry script as a marshalled code object, so there is no
+source inside to diff — but every function's signature, docstring, constants
+and bytecode can be compared exactly. It answers the question that matters
+after an edit: is the shipped exe still this source? The release workflow runs
+it and refuses to publish a mismatch.
+
+```bash
+python scripts/make_demo.py         # docs/demo.gcs and docs/demo.png
+python scripts/make_demo_anim.py    # the animation at the top of this page
+python scripts/gen_icon.py          # docs/gcsviewer.ico
+python scripts/check_demo.py        # the committed stone matches its generator
+```
+
+![the icon at 16, 24, 32, 48, 64, 128 and 256 pixels](docs/icon-preview.png)
+
+The icon is the demo stone drawn by the viewer's own renderer, so it cannot
+drift from what the program produces.
+
 ## Tests
 
 ```bash

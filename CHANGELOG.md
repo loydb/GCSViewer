@@ -5,6 +5,13 @@ Every release is built, self-tested and published by
 publish a tag that disagrees with `__version__` and refuses to ship an
 executable whose frozen code does not match the committed source.
 
+## 1.0.31
+
+- Building the executable moves to DEVELOPING.md. **Run from source** stays in
+  the README, now saying what it is for: it is how to use the viewer on Mac or
+  Linux, where the download is no use. Corrected the invocation there —
+  `pythonw` is Windows-only.
+
 ## 1.0.30
 
 - Documentation only. The test suites, the verification tooling and the

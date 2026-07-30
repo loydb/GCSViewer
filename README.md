@@ -146,60 +146,32 @@ choice to the app as it was registered when you chose it.
 
 ## Run from source
 
+**This is how to use it on Mac or Linux.** The download is a Windows
+executable, but the program is plain Python and runs anywhere numpy, Pillow and
+tkinter do. There is no double-click integration off Windows, so you pass the
+design on the command line; everything else — the three views, the cutting
+table, the keys — is the same.
+
 ```bash
 pip install -r requirements.txt
 ```
 
 ```bash
-pythonw gcs_viewer.py "stone.gcs"              # the window
+python  gcs_viewer.py "stone.gcs"              # the window
 python  gcs_viewer.py "stone.gcs" --save       # write stone_views.png
 python  gcs_viewer.py "stone.gcs" --save out.png --gray --no-labels
 python  gcs_viewer.py --selftest report.txt    # prove a build works
 python  gcs_viewer.py --version                # which build is this
 ```
 
-numpy, Pillow and tkinter, and nothing else. Developed on Python 3.12; CI runs
-the suite on 3.10, 3.12 and 3.13, on Windows and Linux.
+On Windows use `pythonw` for the window, so no console appears behind it.
+
+Those three libraries are the only dependencies — no matplotlib, no scipy.
+Developed on Python 3.12; CI runs the suite on 3.10, 3.12 and 3.13, on Windows
+and Linux.
 
 Set `GCS_VIEWER_NO_GUI=1` to make errors print to stderr instead of opening a
 message box, so an unattended script cannot stall on a dialog.
-
-## Build the exe
-
-```bash
-python scripts/build_exe.py --clean       # single file
-python scripts/build_exe.py --onedir      # folder build
-```
-
-Both shapes are attached to every release. The build then updates the copy
-Windows actually launches, reading that path out of the `.gcs` association
-rather than assuming it; `--no-install` skips that. It refuses to write a
-single-file exe over a folder install, or the reverse.
-
-An unsigned executable downloaded from the internet trips SmartScreen until it
-earns reputation: expect **More info → Run anyway** once.
-
-```bash
-python scripts/compare_exe_source.py GCSViewer.exe gcs_viewer.py
-```
-
-An exe carries its entry script as a marshalled code object, so there is no
-source inside to diff — but every function's signature, docstring, constants
-and bytecode can be compared exactly. It answers the question that matters
-after an edit: is the shipped exe still this source? The release workflow runs
-it and refuses to publish a mismatch.
-
-```bash
-python scripts/make_demo.py         # docs/demo.gcs and docs/demo.png
-python scripts/make_demo_anim.py    # the animation at the top of this page
-python scripts/gen_icon.py          # docs/gcsviewer.ico
-python scripts/check_demo.py        # the committed stone matches its generator
-```
-
-![the icon at 16, 24, 32, 48, 64, 128 and 256 pixels](docs/icon-preview.png)
-
-The icon is the demo stone drawn by the viewer's own renderer, so it cannot
-drift from what the program produces.
 
 ## Developing
 
