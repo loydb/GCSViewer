@@ -5,6 +5,22 @@ Every release is built, self-tested and published by
 publish a tag that disagrees with `__version__` and refuses to ship an
 executable whose frozen code does not match the committed source.
 
+## 1.0.28
+
+- `scripts/Show-OpenWithList.ps1` now answers the question that actually
+  matters. It reported what Windows *offers* in the open-with list, which was
+  green throughout the evening double-click was broken. It now also walks the
+  launch chain — effective ProgId, its default verb, that verb's command, and
+  whether the program exists — and names the exact link that is missing. A
+  file type with no default verb is reported in the words that would have
+  saved hours: *Explorer will show the picker and picking the app will do
+  nothing.*
+- It also finds stale shell display names, the fifth hiding place for a ghost
+  entry and the one found only after the other four were clear. Scoped to this
+  program on purpose: unscoped it matched 475 rows from every app the machine
+  had ever uninstalled, and printing a delete command for each would invite
+  clearing unrelated programs' entries to fix ours.
+
 ## 1.0.27
 
 - The installer is now tested by **running** it, not only by reading it:
