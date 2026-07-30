@@ -12,6 +12,12 @@ still the source?" - without a decompiler.
 
 Run it with the same Python major.minor that built the exe; marshal's format
 is version-specific and older interpreters cannot read a newer stream.
+
+SECURITY: this tool marshal.loads() the code object out of the exe, and
+marshal on untrusted data is unsafe (a crafted stream can crash or worse).
+Only ever run it against an exe you built locally on this machine - never a
+binary downloaded from anywhere.  Its only job is to confirm a *local* build
+still matches the source in this repo.
 """
 
 import marshal
@@ -27,6 +33,8 @@ def frozen_code(exe_path, entry_name):
     blob = arch.extract(entry_name)
     if isinstance(blob, tuple):          # older readers return (typecode, data)
         blob = blob[-1]
+    # marshal.loads on untrusted bytes is unsafe - only run this against a
+    # locally built exe (see the module docstring), never a downloaded one.
     return marshal.loads(blob)
 
 

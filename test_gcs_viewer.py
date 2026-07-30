@@ -303,6 +303,48 @@ def test_parse_gcs_bad_normal(tmp):
           facets[0]["normal"])
 
 
+def test_parse_gcs_facet_cap(tmp):
+    """A .gcs must not be allowed to declare an unbounded number of facets and
+    drive the parser out of memory - past MAX_FACETS it is refused with a clear
+    ValueError rather than loaded.  The cap is exercised with a lowered limit,
+    so the test needs a handful of facets and not two hundred thousand."""
+    facet = ('    <facet nx="0" ny="0" nz="1" index_angle="0">\n'
+             '      <vertex x="-0.5" y="-0.5" z="0.0" />\n'
+             '      <vertex x="0.5" y="-0.5" z="0.0" />\n'
+             '      <vertex x="0.0" y="0.5" z="0.3" />\n'
+             '    </facet>\n')
+    xml = ('<GemCutStudio version="1000">\n'
+           '  <index gear="96" />\n'
+           '  <tier name="P1" instructions="x">\n'
+           + facet * 5 +
+           '  </tier>\n'
+           '</GemCutStudio>\n')
+    p = os.path.join(tmp, "toomany.gcs")
+    with open(p, "w", encoding="utf-8") as fh:
+        fh.write(xml)
+
+    saved, msg = gv.MAX_FACETS, ""
+    gv.MAX_FACETS = 3
+    raised = False
+    try:
+        gv.parse_gcs(p)
+    except ValueError as e:                    # noqa: BLE001
+        raised, msg = True, str(e)
+    finally:
+        gv.MAX_FACETS = saved
+    check("gcs: more facets than the cap raises ValueError", raised,
+          "no exception")
+    check("gcs: and the message names the facet limit",
+          "facet" in msg.lower(), msg)
+
+    # the real cap is generous, so an ordinary file is never touched by it
+    g = os.path.join(tmp, "underthecap.gcs")
+    with open(g, "w", encoding="utf-8") as fh:
+        fh.write(GCS_XML)
+    ok, _, _ = gv.parse_gcs(g)
+    check("gcs: a normal file is unaffected by the cap", len(ok) == 2, len(ok))
+
+
 # ---------------------------------------------------------------------------
 # 2. write_gcs round-trip  (the solver writes stones through this)
 # ---------------------------------------------------------------------------
@@ -549,6 +591,27 @@ def test_parse_gem_no_trailing(tmp):
     check("gem: parses with no trailing strings at all", len(facets) == 3)
     check("gem: no title invented when the file has none",
           not (info.get("title") or "").strip(), info.get("title"))
+
+
+def test_parse_gem_adversarial_tail(tmp):
+    """A .gem whose trailing block is megabytes of string-shaped bytes must not
+    turn the trailing-string sweep into an O(n^2) hang.  The sweep tried a chain
+    from every byte offset to the end of the file, so one valid facet followed
+    by a few MB of repeating varint-string bytes took the reader effectively
+    forever.  Bounded to a small window, it finishes in well under a second."""
+    import time
+    p = os.path.join(tmp, "adversarial.gem")
+    write_gem(p, GEM_TIERS)                     # one small, valid stone
+    with open(p, "ab") as fh:                   # ... then a hostile tail
+        fh.write(b"\x07ABCDEFG" * (512 * 1024))    # ~4 MB of string-start bytes
+
+    t0 = time.perf_counter()
+    facets, _, _ = gv.parse_gem(p)
+    dt = time.perf_counter() - t0
+    check("gem: an adversarial trailing block parses without a hang", dt < 3.0,
+          "%.2fs" % dt)
+    check("gem: the real facets are still recovered", len(facets) == 3,
+          len(facets))
 
 
 def test_load_design_dispatch(tmp):
@@ -1278,12 +1341,14 @@ def main():
         test_parse_gcs_encodings(tmp)
         test_empty_files(tmp)
         test_parse_gcs_bad_normal(tmp)
+        test_parse_gcs_facet_cap(tmp)
         test_write_gcs_roundtrip(tmp)
         test_write_gcs_bytes(tmp)
         test_write_gcs_same_named_tiers(tmp)
         test_parse_gem(tmp)
         test_parse_gem_long_notes(tmp)
         test_parse_gem_no_trailing(tmp)
+        test_parse_gem_adversarial_tail(tmp)
         test_load_design_dispatch(tmp)
         test_tier_table()
         test_tier_table_multi_instruction()
