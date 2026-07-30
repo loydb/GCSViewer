@@ -5,6 +5,12 @@ Every release is built, self-tested and published by
 publish a tag that disagrees with `__version__` and refuses to ship an
 executable whose frozen code does not match the committed source.
 
+## 1.0.30
+
+- Documentation only. The test suites, the verification tooling and the
+  constraints on the shared parsing API move out of the README into
+  DEVELOPING.md; the README is now about using the program.
+
 ## 1.0.29
 
 - Documentation only. README and INSTALL.md cut roughly in half; the reference
