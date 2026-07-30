@@ -5,6 +5,12 @@ Every release is built, self-tested and published by
 publish a tag that disagrees with `__version__` and refuses to ship an
 executable whose frozen code does not match the committed source.
 
+## 1.0.29
+
+- Documentation only. README and INSTALL.md cut roughly in half — the
+  post-mortems, timings and rationale that had accumulated in them belong in
+  this file, not in the page somebody reads to find out what the program does.
+
 ## 1.0.28
 
 - `scripts/Show-OpenWithList.ps1` now answers the question that actually
