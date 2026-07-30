@@ -39,6 +39,17 @@ from PIL import Image, ImageDraw, ImageFont
 # a binary four weeks behind its own source once.
 __version__ = "1.0.31"
 
+# Resource ceilings.  A design file is a few hundred KB and the heaviest real
+# stone in the reference collection is 4,200 facets, so these caps are generous
+# multiples of anything real - a well-formed file never trips them - while a
+# corrupt or hostile one cannot drive the parser into unbounded memory or a
+# hang.  The ValueErrors they raise reach the same _error_window path as any
+# other unreadable file.
+MAX_FILE_BYTES = 256 * 1024 * 1024      # 256 MB - refuse to read anything larger
+MAX_FACETS = 200_000                    # ~50x the heaviest real design
+MAX_VERTS_PER_FACET = 4096              # a facet is a small polygon, not a mesh
+MAX_COORD = 1e4                         # |x|,|y|,|z| bound (matches the .gem reader)
+
 # ----------------------------------------------------------------------------
 # Parsing
 # ----------------------------------------------------------------------------
@@ -85,6 +96,10 @@ def parse_gcs(path):
     info     : dict from the <info> element
     material : dict with 'color' (r,g,b in 0..1) and any render attributes
     """
+    size = os.path.getsize(path)
+    if size > MAX_FILE_BYTES:
+        raise ValueError("The file is too large to read (%d bytes; limit %d)."
+                         % (size, MAX_FILE_BYTES))
     root = _read_xml(path)
 
     gear = 96.0
@@ -103,11 +118,19 @@ def parse_gcs(path):
         tname = tier.get("name", "")
         tinstr = tier.get("instructions", "") or ""
         for facet in tier.findall("facet"):
+            vlist = facet.findall("vertex")
+            if len(vlist) > MAX_VERTS_PER_FACET:
+                raise ValueError("A facet has %d vertices (limit %d) - the file "
+                                 "is malformed." % (len(vlist), MAX_VERTS_PER_FACET))
             verts = [[float(v.get("x")), float(v.get("y")), float(v.get("z"))]
-                     for v in facet.findall("vertex")]
+                     for v in vlist]
             if len(verts) < 3:
                 continue
             verts = np.array(verts, dtype=float)
+            if not np.isfinite(verts).all() or np.abs(verts).max() >= MAX_COORD:
+                raise ValueError("A vertex coordinate is non-finite or out of "
+                                 "range (|coord| >= %g) - the file is malformed."
+                                 % MAX_COORD)
             try:
                 n = np.array([float(facet.get("nx")), float(facet.get("ny")),
                               float(facet.get("nz"))], dtype=float)
@@ -120,21 +143,35 @@ def parse_gcs(path):
                 n = n / nl if nl > 1e-12 else np.array([0.0, 0.0, 1.0])
             facets.append({"verts": verts, "normal": n, "tier": tname,
                            "instr": tinstr, "tid": tid})
+            if len(facets) > MAX_FACETS:
+                raise ValueError("The file declares more than %d facets - "
+                                 "refusing to load." % MAX_FACETS)
         tid += 1
 
     # facets that live outside any <tier> (defensive)
     if not facets:
         for facet in root.iter("facet"):
+            vlist = facet.findall("vertex")
+            if len(vlist) > MAX_VERTS_PER_FACET:
+                raise ValueError("A facet has %d vertices (limit %d) - the file "
+                                 "is malformed." % (len(vlist), MAX_VERTS_PER_FACET))
             verts = [[float(v.get("x")), float(v.get("y")), float(v.get("z"))]
-                     for v in facet.findall("vertex")]
+                     for v in vlist]
             if len(verts) < 3:
                 continue
             verts = np.array(verts, dtype=float)
+            if not np.isfinite(verts).all() or np.abs(verts).max() >= MAX_COORD:
+                raise ValueError("A vertex coordinate is non-finite or out of "
+                                 "range (|coord| >= %g) - the file is malformed."
+                                 % MAX_COORD)
             n = np.cross(verts[1] - verts[0], verts[2] - verts[0])
             nl = np.linalg.norm(n)
             n = n / nl if nl > 1e-12 else np.array([0.0, 0.0, 1.0])
             facets.append({"verts": verts, "normal": n, "tier": "",
                            "instr": "", "tid": 0})
+            if len(facets) > MAX_FACETS:
+                raise ValueError("The file declares more than %d facets - "
+                                 "refusing to load." % MAX_FACETS)
 
     info = {}
     info_el = root.find("info")
@@ -172,6 +209,15 @@ def parse_gcs(path):
 
 import struct as _struct
 
+# The header before the first facet, and the gap between the last vertex group
+# and the trailing string block, are both small in a well-formed .gem - the
+# real chain is within the first few offsets either way.  Bounding both scans
+# to a small window keeps a hostile file from turning the trailing-string sweep
+# (a chain walk from every start offset) into O(n^2) work.
+_GEM_LEAD_SCAN = 4096                   # bytes searched for the first facet
+_GEM_TAIL_SCAN = 64                     # start offsets tried for the string block
+_GEM_MAX_TRAILING = 64                  # title + note lines kept from that block
+
 
 def _newell(V):
     n = np.zeros(3)
@@ -186,7 +232,12 @@ def _newell(V):
 
 
 def parse_gem(path):
-    B = open(path, "rb").read()
+    size = os.path.getsize(path)
+    if size > MAX_FILE_BYTES:
+        raise ValueError("The file is too large to read (%d bytes; limit %d)."
+                         % (size, MAX_FILE_BYTES))
+    with open(path, "rb") as fh:
+        B = fh.read()
     if not B:
         raise ValueError("The file is empty (0 bytes).")
 
@@ -223,11 +274,12 @@ def parse_gem(path):
         d = _struct.unpack_from("<3d", B, a + 4)
         return all(math.isfinite(v) and abs(v) < 1e4 for v in d)
 
-    # locate the first facet
+    # locate the first facet (only the small header precedes it)
     S = 0
-    while S < len(B) and not facet_at(S):
+    lead_limit = min(len(B), _GEM_LEAD_SCAN)
+    while S < lead_limit and not facet_at(S):
         S += 1
-    if S >= len(B):
+    if S >= lead_limit or not facet_at(S):
         raise ValueError("No facets found in .gem file.")
 
     pos = S
@@ -253,8 +305,13 @@ def parse_gem(path):
             if flag == 1:                     # flag-0 group is the stored normal
                 verts.append(d)
             pos += 28
+            if len(verts) > MAX_VERTS_PER_FACET:
+                break
         if len(verts) >= 3:
             raw.append((name, instr, verts))
+        if len(raw) > MAX_FACETS:
+            raise ValueError("The .gem declares more than %d facets - refusing "
+                             "to load." % MAX_FACETS)
     if not raw:
         raise ValueError("No facets parsed from .gem file.")
 
@@ -280,14 +337,14 @@ def parse_gem(path):
     # try every start offset and keep the chain that parses the most strings.
     def chain_at(p):
         out = []
-        while p < len(B):
+        while p < len(B) and len(out) < _GEM_MAX_TRAILING:
             s, p2 = varint_str(p)
             if s is None:
                 break
             out.append(s); p = p2
         return out
     trailing = []
-    for start in range(pos, len(B)):
+    for start in range(pos, min(len(B), pos + _GEM_TAIL_SCAN)):
         c = chain_at(start)
         if len(c) > len(trailing):
             trailing = c
@@ -901,6 +958,26 @@ def folder_designs(path, keep=8):
     return files
 
 
+def _unique_path(path):
+    """A variant of `path` that does not overwrite a file already there.
+
+    The interactive S key saves a PNG beside the design, and the viewer steps
+    through a whole folder one stone at a time - silently clobbering an earlier
+    save on a name clash is a surprise for a single keypress, so the second
+    save lands next to the first (" (1)", " (2)"...) rather than on top of it.
+    An explicitly named output is the caller's own choice and is left alone.
+    """
+    if not os.path.exists(path):
+        return path
+    stem, ext = os.path.splitext(path)
+    i = 1
+    while True:
+        cand = "%s (%d)%s" % (stem, i, ext)
+        if not os.path.exists(cand):
+            return cand
+        i += 1
+
+
 class ViewerApp:
     def __init__(self, path, gray=False, labels=True):
         import tkinter as tk
@@ -1079,7 +1156,7 @@ class ViewerApp:
         self._composite_and_show()
 
     def _save(self):
-        out = os.path.splitext(self.path)[0] + "_views.png"
+        out = _unique_path(os.path.splitext(self.path)[0] + "_views.png")
         panels = make_panels(self.facets, self.scale, self.color,
                              (self.az, self.el), size=680, ss=3,
                              gray=self.gray, labels=self.labels)
@@ -1088,7 +1165,12 @@ class ViewerApp:
             rows = tier_table(self.facets, gear=self.info.get("gear", 96.0))
             instr_img = render_instructions(rows, width=680 * 3 + 32,
                                             gray=self.gray)
-        compose(panels, self.info, self.path, 680, instr_img=instr_img).save(out)
+        sheet = compose(panels, self.info, self.path, 680, instr_img=instr_img)
+        try:
+            sheet.save(out)
+        except OSError as e:
+            self._set_status(f"Could not write  {out}  ({e})")
+            return
         self._set_status(f"Saved  {out}")
 
     def _center(self):
@@ -1333,13 +1415,23 @@ def main(argv):
         except Exception as e:
             _error_window(f"Could not read:\n{os.path.basename(path)}\n\n{e}")
             return 1
-        out = args[1] if len(args) > 1 else os.path.splitext(path)[0] + "_views.png"
+        # An explicitly named output is the caller's own choice; a defaulted
+        # one is auto-named so a second --save of the same design does not
+        # silently overwrite the first.
+        if len(args) > 1:
+            out = args[1]
+        else:
+            out = _unique_path(os.path.splitext(path)[0] + "_views.png")
         scale = world_scale(facets)
         panels = make_panels(facets, scale, material["color"], (35, 28),
                              size=680, ss=3, gray=gray, labels=labels)
         rows = tier_table(facets, gear=info.get("gear", 96.0))
         instr_img = render_instructions(rows, width=680 * 3 + 32, gray=gray)
-        compose(panels, info, path, 680, instr_img=instr_img).save(out)
+        try:
+            compose(panels, info, path, 680, instr_img=instr_img).save(out)
+        except OSError as e:
+            _error_window(f"Could not write:\n{out}\n\n{e}")
+            return 1
         print("Saved", out)
         return 0
 
