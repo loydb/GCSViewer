@@ -37,7 +37,7 @@ from PIL import Image, ImageDraw, ImageFont
 # that disagrees with this.  A viewer handed out as a bare .exe has no other
 # way to answer "which build is this?" - and this project has already shipped
 # a binary four weeks behind its own source once.
-__version__ = "1.0.31"
+__version__ = "1.0.32"
 
 # Resource ceilings.  A design file is a few hundred KB and the heaviest real
 # stone in the reference collection is 4,200 facets, so these caps are generous

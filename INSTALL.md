@@ -83,6 +83,9 @@ no crown yet, so there is nothing to draw from above.
 .\GCSViewer.exe --selftest report.txt                     # check the program is intact
 ```
 
+Saving never overwrites: press **S** twice on the same design, or run `--save`
+twice, and the second sheet lands beside the first as `stone_views (1).png`.
+
 Set `GCS_VIEWER_NO_GUI=1` when calling from a script: errors then print to the
 console instead of opening a message box.
 

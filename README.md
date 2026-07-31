@@ -158,13 +158,17 @@ pip install -r requirements.txt
 
 ```bash
 python  gcs_viewer.py "stone.gcs"              # the window
-python  gcs_viewer.py "stone.gcs" --save       # write stone_views.png
+python  gcs_viewer.py "stone.gcs" --save       # write stone_views.png beside it
 python  gcs_viewer.py "stone.gcs" --save out.png --gray --no-labels
 python  gcs_viewer.py --selftest report.txt    # prove a build works
 python  gcs_viewer.py --version                # which build is this
 ```
 
 On Windows use `pythonw` for the window, so no console appears behind it.
+
+A defaulted output name is never overwritten — save the same design twice and
+the second lands beside the first as `stone_views (1).png`. A name you give
+explicitly is used as given.
 
 Those three libraries are the only dependencies — no matplotlib, no scipy.
 Developed on Python 3.12; CI runs the suite on 3.10, 3.12 and 3.13, on Windows

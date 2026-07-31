@@ -5,6 +5,20 @@ Every release is built, self-tested and published by
 publish a tag that disagrees with `__version__` and refuses to ship an
 executable whose frozen code does not match the committed source.
 
+## 1.0.32
+
+- Documented the save behaviour introduced by the security pass: a defaulted
+  output name is never overwritten, so a second save lands beside the first as
+  `stone_views (1).png`. An explicitly given name is used as given.
+- Corpus verification of that security pass, since it changed the parsing API
+  the solver imports. Old parser against new across **9,146 `.gcs` files**: no
+  file newly rejected by the resource caps, no facet-count difference. Across
+  **245 `.gem` files**: no failures, no facet-count changes, and **12 titles
+  improved** — bounding the trailing-string sweep stopped it latching onto a
+  mid-note offset and returning note fragments as the title, so *soda_bar_19*
+  now reads "Soda Bar 19" instead of "Are Given for Ordinary Soda-li…".
+  One file, `kansas__kansas.gem`, lost its note block in that change.
+
 ## 1.0.31
 
 - Building the executable moves to DEVELOPING.md. **Run from source** stays in
