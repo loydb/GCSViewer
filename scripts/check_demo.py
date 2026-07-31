@@ -4,16 +4,13 @@ check_demo.py - the committed demo stone still matches its generator.
 
     python scripts/check_demo.py
 
-docs/demo.gcs illustrates the README, and is produced by make_demo.py. If the
-two ever part company, the picture describes a stone the program no longer
-makes.
+docs/demo.gcs illustrates the README and is produced by make_demo.py; if the
+two part company the picture describes a stone the program no longer makes.
 
-Compared as geometry, not as bytes. A .gcs stores full-precision reprs of
-coordinates computed with sin, cos and tan, and those are library calls: the
-last bit differs between the Windows CRT and glibc, so the same generator
-writes files that differ in the seventeenth digit on different machines. A
-byte comparison fails there for reasons that have nothing to do with this
-program - which is exactly what it did on the Linux CI job, once.
+Compared as geometry, not as bytes: a .gcs stores full-precision reprs of
+sin/cos/tan results, and those differ in the last bit between the Windows CRT
+and glibc, so a byte comparison fails across platforms for reasons that have
+nothing to do with this program.
 """
 
 import os

@@ -7,20 +7,18 @@ build_exe.py - freeze the GCS Viewer into a single-file Windows .exe.
     python scripts/build_exe.py --onedir    # folder build instead of onefile
     python scripts/build_exe.py --no-install  # leave dist/ alone, don't copy
 
-"Install" means the copy the .gcs association points at, which is read from
-the registry rather than assumed.  Editing the source and rebuilding into a
-binary nobody launches is precisely how this project once shipped an exe four
-weeks behind its own source, and moving an install to a different folder or
-a different distribution shape re-creates that trap silently.  If the
-registered copy is a folder build and this is a --onefile build, or the
-reverse, the shapes do not match and it says so instead of writing a broken
-mixture.
+"Install" means the copy the .gcs association points at, read from the
+registry rather than assumed - rebuilding into a binary nobody launches is how
+this project once shipped an exe four weeks behind its source.  Mixing
+distribution shapes is refused rather than written: a single-file exe over a
+folder install leaves a stale _internal beside it, and the reverse leaves a
+stub with no libraries.
 
 Needs PyInstaller:  pip install pyinstaller
 
-Note: every PyInstaller path (spec, work, dist) is kept inside this project,
-which lives on D:.  Building with the spec file on C: has failed on this
-machine, so do not "helpfully" move it back to a temp directory.
+Every PyInstaller path (spec, work, dist) is kept inside this project, which
+lives on D:.  Building with the spec file on C: has failed on this machine, so
+do not move it to a temp directory.
 """
 
 import os
