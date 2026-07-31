@@ -17,7 +17,12 @@ executable whose frozen code does not match the committed source.
   improved** — bounding the trailing-string sweep stopped it latching onto a
   mid-note offset and returning note fragments as the title, so *soda_bar_19*
   now reads "Soda Bar 19" instead of "Are Given for Ordinary Soda-li…".
-  One file, `kansas__kansas.gem`, lost its note block in that change.
+  One design lost its note block in that change — `kansas.gem`, which appears
+  twice in the collection. Its notes sit at offset 5,914 of 6,079, far past the
+  last vertex group and outside the bounded window. Measured before deciding
+  whether to widen it: of 245 files, 9 have a title but no notes, and only that
+  one design has a longer chain hiding further in. Widening the window to
+  recover it would risk the 12 titles the bound fixed, so the bound stays.
 
 ## 1.0.31
 
