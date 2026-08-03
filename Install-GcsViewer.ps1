@@ -94,10 +94,14 @@ foreach ($ext in @('.gcs', '.gem')) {
 # would not launch, "Just once" grayed, defaults would not stick).  The
 # Applications\<exe> entry + OpenWithList above are sufficient for listing;
 # the "Choose an app on your PC" browse fallback always works regardless.
-# This block now REPAIRS machines that have the old registration.
+# This block now REPAIRS machines that have the old registration.  The
+# HKCU:\Software\GCSViewer key itself survives as a plain settings key
+# (InstallPath breadcrumb below) - what matters is that no Capabilities
+# subkey and no RegisteredApplications pointer exist.
+$capRoot = "HKCU:\Software\GCSViewer"
 Remove-ItemProperty "HKCU:\Software\RegisteredApplications" "GCS Viewer" `
     -ErrorAction SilentlyContinue
-Remove-Item "HKCU:\Software\GCSViewer" -Recurse -Force -ErrorAction SilentlyContinue
+Remove-Item "$capRoot\Capabilities" -Recurse -Force -ErrorAction SilentlyContinue
 
 # Start Menu shortcut - Windows 11's "Open with" list is built from registered apps
 $lnk = Join-Path ([Environment]::GetFolderPath('Programs')) "GCS Viewer.lnk"

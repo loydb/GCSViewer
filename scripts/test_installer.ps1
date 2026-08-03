@@ -51,6 +51,14 @@ try {
         Set-Content -Path (Join-Path $tmp $script) -Value $text -Encoding utf8
     }
 
+    # seed the registration an OLD installer used to write: the installer
+    # must now REPAIR it away (a per-user Capabilities identity duplicated
+    # the app in the Win11 picker and made selections un-launchable)
+    New-Item -Path "HKCU:\Software\$capRoot\Capabilities\FileAssociations" -Force | Out-Null
+    Set-ItemProperty "HKCU:\Software\$capRoot\Capabilities" "ApplicationName" $appName
+    New-Item -Path "HKCU:\Software\RegisteredApplications" -Force | Out-Null
+    Set-ItemProperty "HKCU:\Software\RegisteredApplications" $appName "Software\$capRoot\Capabilities"
+
     & powershell -ExecutionPolicy Bypass -File (Join-Path $tmp "Install-GcsViewer.ps1") *> $null
     Check "installer exits 0" ($LASTEXITCODE -eq 0) "exit $LASTEXITCODE"
 
@@ -87,12 +95,15 @@ try {
     Check "the Applications entry declares the extension supported" `
         ((Get-Item "$classes\Applications\$appKey\SupportedTypes" -EA SilentlyContinue).GetValueNames() -contains $ext) "absent"
 
+    # the per-user Capabilities identity duplicated the app in the Win11
+    # picker (two identical rows, grayed buttons, defaults would not
+    # stick).  The installer must REMOVE the seeded old registration and
+    # never create one.
     $cap = "HKCU:\Software\$capRoot\Capabilities"
-    Check "a Capabilities key is registered" (Test-Path $cap) "absent"
-    Check "Capabilities maps the extension to the ProgId" `
-        ((Get-ItemProperty "$cap\FileAssociations" -Name $ext -EA SilentlyContinue).$ext -eq $progId) "absent"
-    Check "the app is in RegisteredApplications" `
-        ($null -ne (Get-ItemProperty "HKCU:\Software\RegisteredApplications" -Name $appName -EA SilentlyContinue)) "absent"
+    Check "the old Capabilities registration is repaired away" `
+        (-not (Test-Path $cap)) "Capabilities key still present"
+    Check "the app is NOT in RegisteredApplications" `
+        ($null -eq (Get-ItemProperty "HKCU:\Software\RegisteredApplications" -Name $appName -EA SilentlyContinue)) "still registered"
 
     $lnk = Join-Path ([Environment]::GetFolderPath('Programs')) "$appName.lnk"
     Check "a Start Menu shortcut is created" (Test-Path $lnk) "absent"
