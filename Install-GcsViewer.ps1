@@ -87,24 +87,17 @@ foreach ($ext in @('.gcs', '.gem')) {
     Set-ItemProperty $owl "MRUList" "a"
 }
 
-# Registered application (Default Programs).  This is what makes Windows 11
-# list "GCS Viewer" at all - in the "Select an app to open this file" dialog
-# and in Settings > Apps > Default apps.  Without it the app is reachable
-# only through "Choose an app on your PC", browsing to the .exe by hand,
-# because that dialog is built from RegisteredApplications rather than from
-# the Applications\<exe> entry above.
-$capRoot = "HKCU:\Software\GCSViewer"
-New-Item -Path "$capRoot\Capabilities\FileAssociations" -Force | Out-Null
-Set-ItemProperty "$capRoot\Capabilities" "ApplicationName"        "GCS Viewer"
-Set-ItemProperty "$capRoot\Capabilities" "ApplicationDescription" `
-    "View Gemcut Studio .gcs and GemCad .gem faceting designs - three shaded views and the cutting instructions."
-Set-ItemProperty "$capRoot\Capabilities" "ApplicationIcon"        "`"$launcher`",0"
-foreach ($ext in @('.gcs', '.gem')) {
-    Set-ItemProperty "$capRoot\Capabilities\FileAssociations" $ext $progId
-}
-New-Item -Path "HKCU:\Software\RegisteredApplications" -Force | Out-Null
-Set-ItemProperty "HKCU:\Software\RegisteredApplications" "GCS Viewer" `
-    "Software\GCSViewer\Capabilities"
+# RegisteredApplications/Capabilities: REMOVED 2026-08-03.  A per-user
+# Capabilities registration creates a SECOND "GCS Viewer" identity in the
+# Windows 11 picker alongside the Applications\<exe> entry - two identical
+# rows, and on this machine the pair made the picker unusable (selection
+# would not launch, "Just once" grayed, defaults would not stick).  The
+# Applications\<exe> entry + OpenWithList above are sufficient for listing;
+# the "Choose an app on your PC" browse fallback always works regardless.
+# This block now REPAIRS machines that have the old registration.
+Remove-ItemProperty "HKCU:\Software\RegisteredApplications" "GCS Viewer" `
+    -ErrorAction SilentlyContinue
+Remove-Item "HKCU:\Software\GCSViewer" -Recurse -Force -ErrorAction SilentlyContinue
 
 # Start Menu shortcut - Windows 11's "Open with" list is built from registered apps
 $lnk = Join-Path ([Environment]::GetFolderPath('Programs')) "GCS Viewer.lnk"
