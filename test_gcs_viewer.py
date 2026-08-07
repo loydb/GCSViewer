@@ -967,24 +967,79 @@ def test_footer():
           gv._fit_text(font, short, 600) == short)
 
 
+def test_frosting(tmp):
+    """Edge-frosting tools mark matte facets with a frosting attribute;
+    frosted and polished facets must parse apart, survive a round-trip,
+    and render visibly differently (a frosted band that draws exactly
+    like polish is invisible - the whole point of the finish is lost)."""
+    xml = GCS_XML.replace(
+        '<facet nx="0.0" ny="-0.68" nz="-0.73" index_angle="0">',
+        '<facet nx="0.0" ny="-0.68" nz="-0.73" index_angle="0" frosting="0.5">')
+    p = os.path.join(tmp, "frosted.gcs")
+    with open(p, "w", encoding="utf-8") as fh:
+        fh.write(xml)
+    facets, info, material = gv.parse_gcs(p)
+    check("frosting: the marked facet carries its roughness",
+          facets[0].get("frosting") == 0.5, facets[0].get("frosting"))
+    check("frosting: an unmarked facet is polished (None)",
+          facets[1].get("frosting") is None, facets[1].get("frosting"))
+
+    out = os.path.join(tmp, "frosted_out.gcs")
+    gv.write_gcs(out, facets, info, material, gear=info.get("gear", 96))
+    back, _, _ = gv.parse_gcs(out)
+    check("frosting: write_gcs round-trips the marker",
+          back[0].get("frosting") == 0.5 and back[1].get("frosting") is None,
+          [f.get("frosting") for f in back])
+
+    # a frosted facet must not render identically to a polished one
+    scale = gv.world_scale(facets)
+    basis = gv.view_basis(0, -45)          # the P1 facet faces this camera
+    polished = [dict(facets[0], frosting=None)]
+    frosted = [dict(facets[0])]
+    a = gv.render_view(polished, basis, scale, (0.2, 0.55, 0.9),
+                       size=160, ss=2, labels=False)
+    b = gv.render_view(frosted, basis, scale, (0.2, 0.55, 0.9),
+                       size=160, ss=2, labels=False)
+    # one small facet on a 160px panel dilutes a whole-image mean to
+    # nothing, so measure where the difference actually is: how many
+    # pixels moved, and by how much
+    import numpy as _np
+
+    def _difference(im_a, im_b):
+        d = _np.abs(_np.asarray(im_a, dtype=int)
+                    - _np.asarray(im_b, dtype=int)).max(axis=2)
+        return int((d > 6).sum()), int(d.max())
+
+    area, peak = _difference(a, b)
+    check("frosting: frosted facet renders visibly differently",
+          area > 200 and peak >= 25, (area, peak))
+    area, peak = _difference(
+        gv.render_view(polished, basis, scale, (0.2, 0.55, 0.9),
+                       size=160, ss=2, gray=True, labels=False),
+        gv.render_view(frosted, basis, scale, (0.2, 0.55, 0.9),
+                       size=160, ss=2, gray=True, labels=False))
+    check("frosting: gray theme still distinguishes it",
+          area > 200 and peak >= 25, (area, peak))
+
+
 def test_compose():
     facets = synthetic_stone()
     scale = gv.world_scale(facets)
     panels = gv.make_panels(facets, scale, (0.2, 0.55, 0.9), (35, 28),
                             size=160, ss=1, gray=False, labels=False)
-    check("compose: three panels", len(panels) == 3)
+    check("compose: four panels (top, pavilion, side, 3/4)", len(panels) == 4)
 
     rows = gv.tier_table(facets, gear=96)
-    instr = gv.render_instructions(rows, width=160 * 3 + 32)
-    check("compose: instruction panel spans the three renders",
-          instr.width == 160 * 3 + 32, instr.width)
+    instr = gv.render_instructions(rows, width=160 * 4 + 48)
+    check("compose: instruction panel spans the four renders",
+          instr.width == 160 * 4 + 48, instr.width)
     check("compose: instruction panel has height for every row",
           instr.height > len(rows) * 12, (instr.height, len(rows)))
 
     sheet = gv.compose(panels, {"title": "Synthetic"}, "synthetic.gcs", 160,
                        instr_img=instr)
-    check("compose: sheet is wide enough for three panels",
-          sheet.width >= 160 * 3, sheet.size)
+    check("compose: sheet is wide enough for four panels",
+          sheet.width >= 160 * 4, sheet.size)
     check("compose: sheet is taller with the table than without",
           sheet.height > gv.compose(panels, {}, "x.gcs", 160).height)
 
@@ -1356,6 +1411,7 @@ def main():
         test_render()
         test_depth_order_and_culling()
         test_footer()
+        test_frosting(tmp)
         test_compose()
         test_folder_listing(tmp)
         test_instruction_cache()

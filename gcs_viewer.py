@@ -4,11 +4,15 @@ GCS Viewer - render a Gemcut Studio (.gcs) faceted gem.
 
 Author - Loyd Blankenship, but mostly Claude Code...
 
-Shows three flat-shaded renders of the stone, tinted with the material
+Shows four flat-shaded renders of the stone, tinted with the material
 colour stored in the file:
-  - "Table (top)" : looking straight down the optic axis at the table
-  - "Side"        : the girdle profile
-  - "3/4 view"    : drag to turn it left and right, arrow keys to tip it
+  - "Table (top)"       : looking straight down the optic axis at the table
+  - "Pavilion (bottom)" : straight up at the culet, lit from below
+  - "Side"              : the girdle profile
+  - "3/4 view"          : drag to turn it left and right, arrow keys to tip it
+
+Facets carrying a frosting attribute (matte finish from edge-frosting
+tools) render flatter, without specular highlight, under a dot stipple.
 
 Left/Right arrows step through the other .gcs files in the same folder
 (wrapping around), like the Windows photo viewer.
@@ -31,13 +35,13 @@ import math
 import xml.etree.ElementTree as ET
 
 import numpy as np
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageFont
 
 # Bumped with the release tag; the release workflow refuses to publish a tag
 # that disagrees with this.  A viewer handed out as a bare .exe has no other
 # way to answer "which build is this?" - and this project has already shipped
 # a binary four weeks behind its own source once.
-__version__ = "1.0.32"
+__version__ = "1.0.33"
 
 # Resource ceilings.  A design file is a few hundred KB and the heaviest real
 # stone in the reference collection is 4,200 facets, so these caps are generous
@@ -141,8 +145,17 @@ def parse_gcs(path):
                 n = np.cross(verts[1] - verts[0], verts[2] - verts[0])
                 nl = np.linalg.norm(n)
                 n = n / nl if nl > 1e-12 else np.array([0.0, 0.0, 1.0])
+            # frosting: a matte finish marker written by edge-frosting tools.
+            # Presence of the attribute means frosted; the value (usually
+            # 0.5) is the roughness.  None = polished.
+            frost = facet.get("frosting")
+            if frost is not None:
+                try:
+                    frost = float(frost)
+                except (TypeError, ValueError):
+                    frost = 0.5
             facets.append({"verts": verts, "normal": n, "tier": tname,
-                           "instr": tinstr, "tid": tid})
+                           "instr": tinstr, "tid": tid, "frosting": frost})
             if len(facets) > MAX_FACETS:
                 raise ValueError("The file declares more than %d facets - "
                                  "refusing to load." % MAX_FACETS)
@@ -167,8 +180,14 @@ def parse_gcs(path):
             n = np.cross(verts[1] - verts[0], verts[2] - verts[0])
             nl = np.linalg.norm(n)
             n = n / nl if nl > 1e-12 else np.array([0.0, 0.0, 1.0])
+            frost = facet.get("frosting")
+            if frost is not None:
+                try:
+                    frost = float(frost)
+                except (TypeError, ValueError):
+                    frost = 0.5
             facets.append({"verts": verts, "normal": n, "tier": "",
-                           "instr": "", "tid": 0})
+                           "instr": "", "tid": 0, "frosting": frost})
             if len(facets) > MAX_FACETS:
                 raise ValueError("The file declares more than %d facets - "
                                  "refusing to load." % MAX_FACETS)
@@ -454,6 +473,9 @@ def write_gcs(path, facets, info, material, gear=96):
             n = f["normal"]
             fe = ET.SubElement(te, "facet", nx=fmt(n[0]), ny=fmt(n[1]),
                                nz=fmt(n[2]), index_angle="0")
+            # round-trip the frosted-finish marker (edge-frosting tools)
+            if f.get("frosting") is not None:
+                fe.set("frosting", fmt(f["frosting"]))
             for v in f["verts"]:
                 ET.SubElement(fe, "vertex", x=fmt(v[0]), y=fmt(v[1]), z=fmt(v[2]))
             i += 1
@@ -487,10 +509,75 @@ def write_gcs(path, facets, info, material, gear=96):
 
 LIGHT = np.array([-0.45, -0.35, 0.82])
 LIGHT = LIGHT / np.linalg.norm(LIGHT)
+# the same light mirrored below the girdle, for the straight-on pavilion
+# panel: from underneath most pavilion facets face away from the overhead
+# light and the whole view went near-black
+LIGHT_BELOW = np.array([-0.45, -0.35, -0.82])
+LIGHT_BELOW = LIGHT_BELOW / np.linalg.norm(LIGHT_BELOW)
 AMBIENT = 0.20
 DIFFUSE = 0.80
 SPEC_K = 0.55
 SHININESS = 26.0
+
+
+_DOT_CACHE = {}     # (w, h, ss) -> L-mode dot-lattice mask
+
+
+def _dot_lattice(w, h, ss):
+    """A staggered dot lattice covering the whole canvas, built once per
+    canvas size and reused for every frosted facet (a heavily edge-frosted
+    stone has hundreds of them; per-facet dot loops took minutes)."""
+    key = (w, h, ss)
+    hit = _DOT_CACHE.get(key)
+    if hit is not None:
+        return hit
+    lat = Image.new("L", (w, h), 0)
+    d = ImageDraw.Draw(lat)
+    step = max(3, int(round(3.2 * ss)))
+    r = max(1, int(round(0.7 * ss)))
+    row = 0
+    for y in range(step // 2, h, step):
+        xoff = (step // 2) if (row % 2) else 0
+        row += 1
+        for x in range(step // 2 + xoff, w, step):
+            d.ellipse((x - r, y - r, x + r, y + r), fill=255)
+    _DOT_CACHE.clear()                     # one canvas size live at a time
+    _DOT_CACHE[key] = lat
+    return lat
+
+
+def _stipple(img, d, pts, rgb, ss):
+    """Overlay a fine dot lattice on a frosted facet, clipped to its polygon.
+
+    The dots ride the facet's own shade - darker dots on a light facet,
+    lighter on a dark one - so the texture stays visible in both the color
+    and gray themes without hiding the facet edges (the outline is drawn by
+    the caller, before this).
+    """
+    xs = [p[0] for p in pts]
+    ys = [p[1] for p in pts]
+    x0 = max(0, int(min(xs)))
+    y0 = max(0, int(min(ys)))
+    x1 = min(img.width, int(max(xs)) + 1)
+    y1 = min(img.height, int(max(ys)) + 1)
+    if x1 <= x0 or y1 <= y0:
+        return
+    # polygon clip mask in bbox coordinates, edge band excluded so the
+    # facet outline stays crisp
+    mask = Image.new("L", (x1 - x0, y1 - y0), 0)
+    md = ImageDraw.Draw(mask)
+    local = [(x - x0, y - y0) for x, y in pts]
+    md.polygon(local, fill=255)
+    md.line(local + [local[0]], fill=0,
+            width=max(2, int(round(2.2 * ss))))
+    # dots where the lattice AND the polygon agree - all C-speed ops
+    lat = _dot_lattice(img.width, img.height, ss).crop((x0, y0, x1, y1))
+    mask = ImageChops.multiply(mask, lat)
+    lum = 0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]
+    k = 0.70 if lum > 92 else 1.55
+    dot = tuple(int(np.clip(c * k + (12 if k > 1 else 0), 0, 255))
+                for c in rgb)
+    img.paste(dot, (x0, y0), mask)
 
 
 def view_basis(az_deg, el_deg):
@@ -578,10 +665,16 @@ def render_view(facets, basis, scale, color, size=620, ss=2,
         depth = float(np.mean(verts @ forward))
 
         lam = max(0.0, float(np.dot(n, lgt)))
-        spec = SPEC_K * (max(0.0, float(np.dot(n, halfway))) ** SHININESS)
-        rgb = base_col * (AMBIENT + DIFFUSE * lam) + spec
+        frosted = f.get("frosting") is not None
+        if frosted:
+            # matte: no specular highlight, softened diffuse - a frosted
+            # facet scatters instead of reflecting
+            rgb = base_col * (AMBIENT + 0.72 * DIFFUSE * lam + 0.10)
+        else:
+            spec = SPEC_K * (max(0.0, float(np.dot(n, halfway))) ** SHININESS)
+            rgb = base_col * (AMBIENT + DIFFUSE * lam) + spec
         rgb = tuple(int(np.clip(c * 255, 0, 255)) for c in rgb)
-        drawables.append((depth, sx, sy, rgb, f["tier"]))
+        drawables.append((depth, sx, sy, rgb, f["tier"], frosted))
 
     if not drawables:
         # Not necessarily a fault.  A preform is cut girdle-first and has no
@@ -609,10 +702,13 @@ def render_view(facets, basis, scale, color, size=620, ss=2,
 
     # facet whose name we will print: largest visible facet per tier
     best = {}   # tier -> (area, cx_px, cy_px)
-    for _, sx, sy, rgb, tier in drawables:
+    for _, sx, sy, rgb, tier, frosted in drawables:
         px, py = to_px(sx, sy)
-        d.polygon(list(zip(px.tolist(), py.tolist())), fill=rgb,
+        pts = list(zip(px.tolist(), py.tolist()))
+        d.polygon(pts, fill=rgb,
                   outline=tuple(max(0, c - 70) for c in rgb), width=edge)
+        if frosted:
+            _stipple(img, d, pts, rgb, ss)
         if labels and tier:
             area = _poly_area(px, py)
             if tier not in best or area > best[tier][0]:
@@ -629,10 +725,10 @@ def render_view(facets, basis, scale, color, size=620, ss=2,
 
 
 # ----------------------------------------------------------------------------
-# Composite of the three panels
+# Composite of the four panels
 # ----------------------------------------------------------------------------
 
-PANEL_LABELS = ("Table (top)", "Side", "3/4 view")
+PANEL_LABELS = ("Table (top)", "Pavilion (bottom)", "Side", "3/4 view")
 
 
 def _footer_text(info):
@@ -687,9 +783,16 @@ def _fit_text(font, text, maxw, keep=8):
 
 
 def make_panels(facets, scale, color, angles34, size, ss, gray, labels):
-    bases = [view_basis(0, 90), view_basis(0, 0), view_basis(*angles34)]
+    # az=180 below: GCS presents its pavilion view flipped about the
+    # VERTICAL axis (index 0 stays at the top, indices run CCW), so
+    # match it rather than the 0-at-bottom horizontal-axis flip
+    specs = [(view_basis(0, 90), None),
+             (view_basis(180, -90), LIGHT_BELOW),
+             (view_basis(0, 0), None),
+             (view_basis(*angles34), None)]
     return [render_view(facets, b, scale, color, size=size, ss=ss,
-                        gray=gray, labels=labels) for b in bases]
+                        gray=gray, labels=labels, light=lt)
+            for b, lt in specs]
 
 
 # ----------------------------------------------------------------------------
@@ -1081,6 +1184,9 @@ class ViewerApp:
         self.p_top = render_view(self.facets, view_basis(0, 90), self.scale,
                                  self.color, self.panel, self.ss_static,
                                  self.gray, self.labels)
+        self.p_pav = render_view(self.facets, view_basis(180, -90), self.scale,
+                                 self.color, self.panel, self.ss_static,
+                                 self.gray, self.labels, light=LIGHT_BELOW)
         self.p_side = render_view(self.facets, view_basis(0, 0), self.scale,
                                   self.color, self.panel, self.ss_static,
                                   self.gray, self.labels)
@@ -1094,9 +1200,9 @@ class ViewerApp:
         instr_img = None
         if getattr(self, "show_instr", True):
             rows = tier_table(self.facets, gear=self.info.get("gear", 96.0))
-            instr_img = render_instructions_cached(rows, self.panel * 3 + 32,
+            instr_img = render_instructions_cached(rows, self.panel * 4 + 48,
                                                    gray=self.gray)
-        canvas = compose([self.p_top, self.p_side, self.p_34],
+        canvas = compose([self.p_top, self.p_pav, self.p_side, self.p_34],
                          self.info, self.path, self.panel, instr_img=instr_img)
         self._canvas = canvas
         photo = self.ImageTk.PhotoImage(canvas)
@@ -1163,7 +1269,7 @@ class ViewerApp:
         instr_img = None
         if self.show_instr:
             rows = tier_table(self.facets, gear=self.info.get("gear", 96.0))
-            instr_img = render_instructions(rows, width=680 * 3 + 32,
+            instr_img = render_instructions(rows, width=680 * 4 + 48,
                                             gray=self.gray)
         sheet = compose(panels, self.info, self.path, 680, instr_img=instr_img)
         try:
@@ -1348,7 +1454,7 @@ def _selftest(report_path=None):
         scale = world_scale(back)
         panels = make_panels(back, scale, material["color"], (35, 28),
                              size=240, ss=1, gray=False, labels=True)
-        instr = render_instructions(rows, width=240 * 3 + 32)
+        instr = render_instructions(rows, width=240 * 4 + 48)
         png = os.path.join(tmp, "selftest.png")
         compose(panels, info, gcs, 240, instr_img=instr).save(png)
         size = os.path.getsize(png)
@@ -1426,7 +1532,7 @@ def main(argv):
         panels = make_panels(facets, scale, material["color"], (35, 28),
                              size=680, ss=3, gray=gray, labels=labels)
         rows = tier_table(facets, gear=info.get("gear", 96.0))
-        instr_img = render_instructions(rows, width=680 * 3 + 32, gray=gray)
+        instr_img = render_instructions(rows, width=680 * 4 + 48, gray=gray)
         try:
             compose(panels, info, path, 680, instr_img=instr_img).save(out)
         except OSError as e:

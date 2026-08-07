@@ -41,12 +41,13 @@ GemCad, it only reads their files, and it never modifies what it opens.
 
 ## What it shows
 
-Three orthographic, flat-shaded panels, tinted with the material colour stored
+Four orthographic, flat-shaded panels, tinted with the material colour stored
 in the file:
 
 | Panel | View |
 |---|---|
 | **Table (top)** | straight down the optic axis |
+| **Pavilion (bottom)** | straight up at the culet, lit from below |
 | **Side** | the girdle profile |
 | **3/4 view** | angled — drag to turn it, arrow keys to tip it |
 
