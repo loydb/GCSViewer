@@ -5,6 +5,22 @@ Every release is built, self-tested and published by
 publish a tag that disagrees with `__version__` and refuses to ship an
 executable whose frozen code does not match the committed source.
 
+## 1.0.33
+
+- Frosted facets render distinctly. Edge-frosting tools mark a matte facet
+  with a `frosting` attribute; the viewer now parses it, carries it through
+  `write_gcs` unchanged, and draws the facet flatter — no specular highlight,
+  dimmer diffuse, and a dot stipple clipped inside the facet edges. The dots
+  darken on bright facets and lighten on dark ones, so the finish reads in
+  both the colour and gray themes. The dot lattice is rendered once and
+  cached; designs with hundreds of frosted facets draw at full speed.
+- A fourth panel, **Pavilion (bottom)**: straight up at the culet, lit from
+  below so the view is not in its own shadow. Oriented the way Gem Cut Studio
+  presents its pavilion view — index 0 at the top, indices counterclockwise,
+  the stone flipped about the vertical axis.
+- A facet the frosting tool destroyed leaves an obvious hole in these views
+  rather than a plausible-looking stone; that is the point of looking.
+
 ## 1.0.32
 
 - Documented the save behaviour introduced by the security pass: a defaulted
