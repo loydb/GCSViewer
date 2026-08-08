@@ -11,10 +11,13 @@ flipped to point away from the centre of the stone.  When that inference is
 wrong the facet is culled instead of drawn, and the result is a gem with a
 hole in it, or nothing at all: a perfectly valid PNG of almost nothing.
 
-So this measures ink.  For each design it renders the three panels and reports
-what fraction of each is not background, plus how many facets survived the
-back-face cull.  A solid stone fills a good part of its panel from every
-angle; a stone whose normals are inverted goes nearly empty from at least one.
+So this measures ink.  For each design it renders the four panels the
+application shows and reports what fraction of each is not background, plus
+how many facets survived the back-face cull.  A solid stone fills a good part
+of its panel from every angle; a stone whose normals are inverted goes nearly
+empty from at least one.  The pavilion view earns its place here: a stone
+inverted only below the girdle looks perfectly sound from above and from the
+side, and it is the pavilion that most .gem files spend their facets on.
 
 Only the outliers are printed.  Everything else is a count.
 """
@@ -32,7 +35,8 @@ os.environ.setdefault("GCS_VIEWER_NO_GUI", "1")
 import gcs_viewer as gv
 
 BG = np.array([14, 14, 16])
-VIEWS = (("top", (0, 90)), ("side", (0, 0)), ("34", (35, 28)))
+VIEWS = (("top", (0, 90)), ("pav", (180, -90)), ("side", (0, 0)),
+         ("34", (35, 28)))
 
 # render_view reserves a fixed 46*ss pixel margin, so the drawable area is a
 # fraction of the panel and that fraction depends on the panel size.  At 120
@@ -45,8 +49,11 @@ DRAWABLE = ((PANEL - 2 * MARGIN) / float(PANEL)) ** 2
 
 
 def ink(facets, scale, colour, angles):
+    # light the pavilion from below, as the application does, so a dim panel
+    # here means missing geometry and never merely an unlit one
+    light = gv.LIGHT_BELOW if angles[1] < 0 else None
     img = gv.render_view(facets, gv.view_basis(*angles), scale, colour,
-                         size=PANEL, ss=1, labels=False)
+                         size=PANEL, ss=1, labels=False, light=light)
     a = np.asarray(img).astype(int)
     return float((np.abs(a - BG).max(axis=2) > 6).mean()) / DRAWABLE
 

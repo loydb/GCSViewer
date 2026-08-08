@@ -730,6 +730,19 @@ def render_view(facets, basis, scale, color, size=620, ss=2,
 
 PANEL_LABELS = ("Table (top)", "Pavilion (bottom)", "Side", "3/4 view")
 
+PANEL_PAD = 16          # compose()'s gutter, and its margin at both ends
+
+
+def instr_width(panel, n=len(PANEL_LABELS), pad=PANEL_PAD):
+    """Width of the instruction table under `n` panels of `panel` pixels.
+
+    compose() lays the panels on `pad` gutters with a `pad` margin at each
+    end, and the table spans from the first panel's left edge to the last
+    one's right.  Derived here rather than written out at each call site:
+    when the panel count went from three to four, every hard-coded
+    `panel * 3 + 32` had to be found by hand and one was missed."""
+    return panel * n + pad * (n - 1)
+
 
 def _footer_text(info):
     """The line under the sheet: what the file itself says about the design.
@@ -1094,7 +1107,7 @@ class ViewerApp:
         self.az, self.el = 35.0, 28.0
 
         self.panel = 460          # on-screen panel size
-        self.ss_static = 2        # quality for top/side and idle 3/4
+        self.ss_static = 2        # quality for the fixed panels and idle 3/4
         self.ss_drag = 1          # quality while dragging
 
         # load the first stone (raises on failure - caught by caller)
@@ -1200,7 +1213,7 @@ class ViewerApp:
         instr_img = None
         if getattr(self, "show_instr", True):
             rows = tier_table(self.facets, gear=self.info.get("gear", 96.0))
-            instr_img = render_instructions_cached(rows, self.panel * 4 + 48,
+            instr_img = render_instructions_cached(rows, instr_width(self.panel),
                                                    gray=self.gray)
         canvas = compose([self.p_top, self.p_pav, self.p_side, self.p_34],
                          self.info, self.path, self.panel, instr_img=instr_img)
@@ -1269,7 +1282,7 @@ class ViewerApp:
         instr_img = None
         if self.show_instr:
             rows = tier_table(self.facets, gear=self.info.get("gear", 96.0))
-            instr_img = render_instructions(rows, width=680 * 4 + 48,
+            instr_img = render_instructions(rows, width=instr_width(680),
                                             gray=self.gray)
         sheet = compose(panels, self.info, self.path, 680, instr_img=instr_img)
         try:
@@ -1454,7 +1467,7 @@ def _selftest(report_path=None):
         scale = world_scale(back)
         panels = make_panels(back, scale, material["color"], (35, 28),
                              size=240, ss=1, gray=False, labels=True)
-        instr = render_instructions(rows, width=240 * 4 + 48)
+        instr = render_instructions(rows, width=instr_width(240))
         png = os.path.join(tmp, "selftest.png")
         compose(panels, info, gcs, 240, instr_img=instr).save(png)
         size = os.path.getsize(png)
@@ -1532,7 +1545,7 @@ def main(argv):
         panels = make_panels(facets, scale, material["color"], (35, 28),
                              size=680, ss=3, gray=gray, labels=labels)
         rows = tier_table(facets, gear=info.get("gear", 96.0))
-        instr_img = render_instructions(rows, width=680 * 4 + 48, gray=gray)
+        instr_img = render_instructions(rows, width=instr_width(680), gray=gray)
         try:
             compose(panels, info, path, 680, instr_img=instr_img).save(out)
         except OSError as e:

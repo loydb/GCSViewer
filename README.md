@@ -7,16 +7,16 @@ Look at a faceted gem design without opening the program that cut it.
 
 **[⬇ Download GCSViewer.exe](https://github.com/loydb/GCSViewer/releases/latest/download/GCSViewer.exe)** —
 Windows, nothing to install. Double-click a `.gcs` or `.gem` file and the
-stone is on screen: three shaded views and the cutting instructions.
+stone is on screen: four shaded views and the cutting instructions.
 
 If you open designs all day, take the **folder build** from the
 [releases page](https://github.com/loydb/GCSViewer/releases/latest) instead —
 it starts in a third of the time (427 ms against 1,534 ms), because the single
 file unpacks itself into `%TEMP%` on every launch.
 
-![the demo stone in the viewer — table and side views beside a 3/4 view being turned on both axes, above the cutting instructions](docs/demo-turn.webp)
+![the demo stone in the viewer — table, pavilion and side views beside a 3/4 view being turned on both axes, above the cutting instructions](docs/demo-turn.webp)
 
-*`docs/demo.gcs`, opened in the viewer. The third panel is live: drag to turn
+*`docs/demo.gcs`, opened in the viewer. The last panel is live: drag to turn
 the stone, arrow keys to tip it.*
 
 ## Why
@@ -66,6 +66,12 @@ Rendering is deliberately flat and matte: a painter's algorithm with back-face
 culling, one fixed light and a specular highlight. No refraction, no
 dispersion. Flat shading shows the facets, and a meet that does not meet stays
 visible instead of disappearing into a sparkle.
+
+**Frosted facets** — the matte bands an edge-frosting tool leaves — draw
+without the highlight and under a fine stipple, so they are distinguishable
+from polished facets at a glance in both the colour and grayscale themes.
+Their edges stay drawn, which is the point of looking at a frosted design:
+a facet the tool consumed leaves a visible hole rather than a plausible stone.
 
 ## Formats
 
@@ -150,7 +156,7 @@ choice to the app as it was registered when you chose it.
 **This is how to use it on Mac or Linux.** The download is a Windows
 executable, but the program is plain Python and runs anywhere numpy, Pillow and
 tkinter do. There is no double-click integration off Windows, so you pass the
-design on the command line; everything else — the three views, the cutting
+design on the command line; everything else — the four views, the cutting
 table, the keys — is the same.
 
 ```bash

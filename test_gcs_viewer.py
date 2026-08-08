@@ -1030,9 +1030,22 @@ def test_compose():
     check("compose: four panels (top, pavilion, side, 3/4)", len(panels) == 4)
 
     rows = gv.tier_table(facets, gear=96)
-    instr = gv.render_instructions(rows, width=160 * 4 + 48)
+    instr = gv.render_instructions(rows, width=gv.instr_width(160))
     check("compose: instruction panel spans the four renders",
           instr.width == 160 * 4 + 48, instr.width)
+
+    # instr_width() must agree with what compose() actually lays out, or the
+    # table hangs off the sheet: the panels span the canvas less one margin
+    # at each end.  Hard-coded widths at each call site are what went stale
+    # when the panel count changed, so this pins the formula to the layout.
+    sheet = gv.compose(panels, {"title": "x"}, "x.gcs", 160, instr_img=instr)
+    check("compose: the table spans the panels exactly",
+          sheet.width - 2 * gv.PANEL_PAD == gv.instr_width(160),
+          (sheet.width, gv.instr_width(160)))
+    check("compose: instr_width tracks the panel count",
+          gv.instr_width(100, n=3) == 100 * 3 + 32
+          and gv.instr_width(100, n=4) == 100 * 4 + 48,
+          (gv.instr_width(100, n=3), gv.instr_width(100, n=4)))
     check("compose: instruction panel has height for every row",
           instr.height > len(rows) * 12, (instr.height, len(rows)))
 
@@ -1344,10 +1357,24 @@ def test_installer():
         ("an Applications entry", '$classes\\Applications\\$appKey'),
         ("a friendly app name", "FriendlyAppName"),
         ("SupportedTypes", "SupportedTypes"),
-        ("the Default Programs capabilities", "Capabilities"),
-        ("RegisteredApplications", "RegisteredApplications"),
     ):
         check("installer: writes %s" % what, needle in ps, needle)
+
+    # Capabilities / RegisteredApplications were REMOVED in 1.0.33's
+    # predecessor: a per-user Capabilities registration puts a second "GCS
+    # Viewer" identity in the Win11 picker, which lists the app twice and
+    # makes neither row stick.  Asserting only that the words appear would
+    # pass for the broken version too - it is the verb that matters.
+    check("installer: does not register a per-user Capabilities identity",
+          'New-Item "$capRoot\\Capabilities' not in ps
+          and 'Set-ItemProperty "$capRoot\\Capabilities' not in ps,
+          "it creates Capabilities again")
+    check("installer: repairs away an older version's Capabilities key",
+          'Remove-Item "$capRoot\\Capabilities"' in ps, "no repair present")
+    check("installer: repairs away an older version's RegisteredApplications "
+          "pointer",
+          'Remove-ItemProperty "HKCU:\\Software\\RegisteredApplications"' in ps,
+          "no repair present")
 
     check("installer: registers both extensions",
           "'.gcs', '.gem'" in ps or '".gcs", ".gem"' in ps, "extension loop")
@@ -1371,7 +1398,8 @@ def test_installer():
         un = fh.read()
     for what, needle in (("the ProgId", "$classes\\$progId"),
                          ("the Applications entry", "Applications\\$appKey"),
-                         ("the capabilities", "RegisteredApplications"),
+                         ("the RegisteredApplications pointer",
+                          "RegisteredApplications"),
                          ("the Start Menu shortcut", "GCS Viewer.lnk")):
         check("uninstaller: removes %s" % what, needle in un, needle)
 

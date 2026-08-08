@@ -1,9 +1,9 @@
 # GCS Viewer — Installation
 
 A Windows app that shows a faceted gem from a **Gemcut Studio `.gcs`** or
-**GemCad `.gem`** file as three shaded views — table, side, and a 3/4 view you
-can turn — plus the cutting instructions. After installing, double-clicking a
-design opens it.
+**GemCad `.gem`** file as four shaded views — table, pavilion, side, and a 3/4
+view you can turn — plus the cutting instructions. After installing,
+double-clicking a design opens it.
 
 Nothing else is required: no Python, no libraries, no admin rights.
 

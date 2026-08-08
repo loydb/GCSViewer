@@ -21,6 +21,28 @@ executable whose frozen code does not match the committed source.
 - A facet the frosting tool destroyed leaves an obvious hole in these views
   rather than a plausible-looking stone; that is the point of looking.
 
+Found by the sweep for descriptions the fourth panel had made stale — two of
+them were stale *code*, not stale prose:
+
+- **The README animation was captioning the wrong panels.** `make_demo_anim.py`
+  still composed three, and `compose()` captions by position, so the side view
+  was labelled "Pavilion (bottom)" and the 3/4 view "Side". It now renders the
+  pavilion too. `docs/demo.png` and `docs/demo-turn.webp` are regenerated.
+- **`render_audit.py` never looked underneath.** Its whole purpose is catching
+  stones drawn inside out, and a `.gem` whose normals are inverted only below
+  the girdle looks sound from every view it rendered. The pavilion joins its
+  sweep, lit as the application lights it.
+- **An installer assertion had inverted with the association fix.** It claimed
+  the installer "writes the Default Programs capabilities" — the fix made it
+  *remove* them — and passed only because the word still appeared in the
+  removal code, so it would have passed for the broken version too. It now
+  asserts the verb: no Capabilities identity is created, and an older one is
+  repaired away.
+- The instruction-table width was spelled `panel * 3 + 32` at five call sites,
+  which is how the animation got missed. It is now `instr_width(panel)`,
+  derived from `PANEL_LABELS` and pinned to `compose()`'s real layout by a
+  check, so the next panel-count change cannot strand a caller.
+
 ## 1.0.32
 
 - Documented the save behaviour introduced by the security pass: a defaulted

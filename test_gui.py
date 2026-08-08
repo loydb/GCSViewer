@@ -107,8 +107,8 @@ def main():
                   "stone1.gcs" in app.root.title(), app.root.title())
             check("window: an image is on screen",
                   app.label.cget("image") != "", app.label.cget("image"))
-            check("window: the three panels and the table were composed",
-                  app._canvas.width >= app.panel * 3, app._canvas.size)
+            check("window: the four panels and the table were composed",
+                  app._canvas.width >= app.panel * 4, app._canvas.size)
 
             # -- stepping through the folder --
             app._step_file(1)

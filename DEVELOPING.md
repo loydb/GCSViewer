@@ -51,7 +51,7 @@ drift from what the program produces.
 ## Tests
 
 ```bash
-python test_gcs_viewer.py     # 197 checks
+python test_gcs_viewer.py     # 210 checks
 python test_gui.py            # 37 checks, the window itself
 ```
 
@@ -79,9 +79,11 @@ depth sort can both break without changing a pixel.
 powershell -ExecutionPolicy Bypass -File scripts/test_installer.ps1
 ```
 
-Installs against a throwaway ProgId, extension and app name, reads all 22
-registrations back out of the registry, then runs the uninstaller and checks
-every one is gone. No real association is touched.
+Installs against a throwaway ProgId, extension and app name, reads the
+registrations back out of the registry (21 checks), then runs the uninstaller
+and checks every one is gone. It also seeds the per-user Capabilities identity
+an older installer wrote and asserts this one repairs it away. No real
+association is touched.
 
 ### Against real files
 
