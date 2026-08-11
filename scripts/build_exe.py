@@ -64,8 +64,28 @@ def registered_exe():
 
 
 def is_folder_build(exe_path):
-    """A onedir build keeps its libraries in an _internal folder beside it."""
-    return os.path.isdir(os.path.join(os.path.dirname(exe_path), "_internal"))
+    """Is this exe a launcher whose libraries live in _internal beside it?
+
+    Asked of the exe rather than of its neighbours.  Testing for an _internal
+    directory is what this did, and it was wrong the moment a single-file
+    build was installed where a folder build had been: the stale payload sat
+    there being a neighbour, and the installer refused to update the live
+    single-file copy because it read it as a folder build (2026-08-11).
+
+    What actually separates them is what the exe carries.  A onefile build
+    holds the whole interpreter in its own archive; a launcher holds the
+    bootstrap and nothing else, which is why it needs _internal at all.  The
+    directory test remains the fallback for when PyInstaller is not importable
+    - on a clean install it agrees, and it is the only answer available.
+    """
+    try:
+        from PyInstaller.archive.readers import CArchiveReader
+        names = [str(n).lower() for n in CArchiveReader(exe_path).toc]
+    except Exception:
+        return os.path.isdir(os.path.join(os.path.dirname(exe_path),
+                                          "_internal"))
+    return not any(n.startswith("python3") and n.endswith(".dll")
+                   for n in names)
 
 
 def write_version_file():

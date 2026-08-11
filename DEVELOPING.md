@@ -58,7 +58,7 @@ drift from what the program produces.
 ## Tests
 
 ```bash
-python test_gcs_viewer.py     # 230 checks
+python test_gcs_viewer.py     # 234 checks
 python test_gui.py            # 51 checks, the window itself
 ```
 

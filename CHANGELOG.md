@@ -61,6 +61,11 @@ executable whose frozen code does not match the committed source.
   invented instruction text. A program for reading cutting instructions should
   be pictured reading a design somebody cut. The generated stone still draws
   the icon and `docs/demo.png`, which have to come from the generator alone.
+- **A refractive index is quoted to two decimals** in the footer — `RI
+  1.62-2.14`, not `RI 1.62-2.1400001`. Design programs store the number they
+  computed with, and printing it in full reports float noise as though it were
+  a measurement. A range whose ends round together prints as one number, and a
+  value that is not a number at all is passed through as the file wrote it.
 
 ## 1.0.33
 

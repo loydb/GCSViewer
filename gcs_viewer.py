@@ -830,6 +830,23 @@ def instr_width(panel, n=len(PANEL_LABELS), pad=PANEL_PAD):
     return panel * n + pad * (n - 1)
 
 
+def _ri(value):
+    """A refractive index the way it is written down: two decimals at most.
+
+    Design programs store the number they computed with rather than the one
+    the material is quoted at - the design that illustrates the README gives
+    its upper limit as "2.1400001" - and a footer printing that in full
+    reports float noise as though it were a measurement.  Anything that will
+    not parse is passed through untouched, since it is then something other
+    than a number and the file's own wording is the best available.
+    """
+    try:
+        text = "%.2f" % float(value)
+    except (TypeError, ValueError):
+        return str(value).strip()
+    return text.rstrip("0").rstrip(".") or "0"
+
+
 def _footer_text(info):
     """The line under the sheet: what the file itself says about the design.
 
@@ -848,7 +865,9 @@ def _footer_text(info):
     parts = [info.get("shape", ""), info.get("date", "")]
     ri_min, ri_max = info.get("ri_min"), info.get("ri_max")
     if ri_min and ri_max:
-        parts.append("RI %s-%s" % (ri_min, ri_max))
+        # a range whose ends round together is one number, not a span of zero
+        lo, hi = _ri(ri_min), _ri(ri_max)
+        parts.append("RI %s" % lo if lo == hi else "RI %s-%s" % (lo, hi))
     notes = (info.get("notes") or "").strip()
     if notes:
         parts.append(notes)

@@ -1019,6 +1019,23 @@ def test_footer():
           gv._footer_text({"ri_min": "1.54"}) == "",
           gv._footer_text({"ri_min": "1.54"}))
 
+    # design programs store the number they computed with: a real file gives
+    # its upper limit as 2.1400001, which is float noise, not a measurement
+    noisy = gv._footer_text({"ri_min": "1.62", "ri_max": "2.1400001"})
+    check("footer: an RI is quoted to two decimals",
+          noisy == "RI 1.62-2.14", noisy)
+    check("footer: a trailing zero is not quoted either",
+          gv._ri("1.50") == "1.5" and gv._ri("2") == "2",
+          (gv._ri("1.50"), gv._ri("2")))
+    check("footer: ends that round together print as one number",
+          gv._footer_text({"ri_min": "1.7612", "ri_max": "1.7644"})
+          == "RI 1.76",
+          gv._footer_text({"ri_min": "1.7612", "ri_max": "1.7644"}))
+    check("footer: an RI that is not a number is left as the file wrote it",
+          gv._footer_text({"ri_min": "varies", "ri_max": "n/a"})
+          == "RI varies-n/a",
+          gv._footer_text({"ri_min": "varies", "ri_max": "n/a"}))
+
     # a .gem carries the designer's own notes and none of the rest; they were
     # parsed out of the file and then never displayed anywhere
     note = "Designed by Bob Keller / Suitable for larger stones"
