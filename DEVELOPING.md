@@ -51,8 +51,8 @@ drift from what the program produces.
 ## Tests
 
 ```bash
-python test_gcs_viewer.py     # 210 checks
-python test_gui.py            # 37 checks, the window itself
+python test_gcs_viewer.py     # 219 checks
+python test_gui.py            # 47 checks, the window itself
 ```
 
 No fixtures on disk and no third-party design files: every stone is

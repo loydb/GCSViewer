@@ -1022,6 +1022,69 @@ def test_frosting(tmp):
           area > 200 and peak >= 25, (area, peak))
 
 
+def test_tier_colors():
+    """The tier-colour mode paints each tier its own colour so the cutting
+    order can be read off the stone.  What it must not do is give two tiers
+    the same colour, disagree with the cutting table about what a tier is,
+    or change from one run to the next while a user compares two sheets."""
+    facets = synthetic_stone()
+    pal = gv.tier_palette(facets)
+    rows = gv.tier_table(facets, gear=96)
+
+    check("tier colours: one colour per tier", len(pal) == len(rows),
+          (len(pal), len(rows)))
+    check("tier colours: no two tiers share one",
+          len(set(map(tuple, pal.values()))) == len(pal),
+          sorted(map(tuple, pal.values())))
+    check("tier colours: the same stone gives the same colours",
+          gv.tier_palette(facets) == pal)
+    check("tier colours: every facet finds its colour",
+          all(gv.tier_key(f) in pal for f in facets))
+    check("tier colours: they are pale enough to shade on",
+          all(min(c) > 0.4 and max(c) > 0.9 for c in pal.values()),
+          [tuple(round(x, 2) for x in c) for c in pal.values()])
+
+    # two tiers the file happens to name the same are still two tiers - the
+    # palette must split them exactly where the cutting table does
+    same, tid, prev = [], -1, object()
+    for f in facets:
+        k = gv.tier_key(f)
+        if k != prev:
+            tid, prev = tid + 1, k
+        same.append(dict(f, tier="X", tid=tid))
+    check("tier colours: same-named tiers still colour apart",
+          len(gv.tier_palette(same)) == len(gv.tier_table(same, gear=96)),
+          (len(gv.tier_palette(same)), len(gv.tier_table(same, gear=96))))
+
+    scale = gv.world_scale(facets)
+    basis = gv.view_basis(35, 28)
+    plain = gv.render_view(facets, basis, scale, (0.2, 0.55, 0.9),
+                           size=200, ss=1, labels=False)
+    tinted = gv.render_view(facets, basis, scale, (0.2, 0.55, 0.9),
+                            size=200, ss=1, labels=False, palette=pal)
+    import numpy as _np
+    d = _np.abs(_np.asarray(plain, dtype=int)
+                - _np.asarray(tinted, dtype=int)).max(axis=2)
+    check("tier colours: the panel is drawn differently", int((d > 20).sum()) > 500,
+          int((d > 20).sum()))
+
+    # a tier-coloured render must not be one flat wash: the hues have to
+    # survive onto the pixels, or the mode says nothing the plain one didn't
+    px = _np.asarray(tinted).reshape(-1, 3)
+    lit = px[_np.abs(px - _np.array([14, 14, 16])).max(axis=1) > 6]
+    hues = {tuple(_np.round(p / 32.0).astype(int)) for p in lit}
+    check("tier colours: several distinct colours reach the pixels",
+          len(hues) >= 4, len(hues))
+
+    # grayscale asks for no colour at all; a palette is an explicit request
+    # for these colours, so it wins rather than being silently discarded
+    grayed = gv.render_view(facets, basis, scale, (0.2, 0.55, 0.9),
+                            size=200, ss=1, labels=False, gray=True,
+                            palette=pal)
+    check("tier colours: they survive the gray flag",
+          list(grayed.getdata()) == list(tinted.getdata()))
+
+
 def test_compose():
     facets = synthetic_stone()
     scale = gv.world_scale(facets)
@@ -1440,6 +1503,7 @@ def main():
         test_depth_order_and_culling()
         test_footer()
         test_frosting(tmp)
+        test_tier_colors()
         test_compose()
         test_folder_listing(tmp)
         test_instruction_cache()

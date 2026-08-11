@@ -14,6 +14,10 @@ colour stored in the file:
 Facets carrying a frosting attribute (matte finish from edge-frosting
 tools) render flatter, without specular highlight, under a dot stipple.
 
+The "Colour-code tiers" checkbox (or the C key) repaints every facet by
+its tier instead of by the material, for reading the cutting order off
+the stone.
+
 Left/Right arrows step through the other .gcs files in the same folder
 (wrapping around), like the Windows photo viewer.
 
@@ -23,6 +27,7 @@ Usage:
     python  gcs_viewer.py --selftest [report.txt]        # prove a build works
     python  gcs_viewer.py --version                      # which build is this
     Options: --gray  (grayscale)   --no-labels  (hide tier names)
+             --tier-colors  (a distinct colour per tier)
 
 Set GCS_VIEWER_NO_GUI=1 to make errors print to stderr instead of opening a
 message box, so unattended scripts cannot stall on a dialog.
@@ -32,6 +37,7 @@ import sys
 import os
 import re
 import math
+import colorsys
 import xml.etree.ElementTree as ET
 
 import numpy as np
@@ -41,7 +47,7 @@ from PIL import Image, ImageChops, ImageDraw, ImageFont
 # that disagrees with this.  A viewer handed out as a bare .exe has no other
 # way to answer "which build is this?" - and this project has already shipped
 # a binary four weeks behind its own source once.
-__version__ = "1.0.33"
+__version__ = "1.0.34"
 
 # Resource ceilings.  A design file is a few hundred KB and the heaviest real
 # stone in the reference collection is 4,200 facets, so these caps are generous
@@ -519,6 +525,13 @@ DIFFUSE = 0.80
 SPEC_K = 0.55
 SHININESS = 26.0
 
+# Shading for a tier-coloured facet (see tier_palette).  Lifted and
+# compressed against the material constants above: a diagram whose colours
+# name the tiers has to keep those colours distinguishable everywhere on the
+# stone, including the facets turned away from the light.
+TINT_AMBIENT = 0.62
+TINT_DIFFUSE = 0.38
+
 
 _DOT_CACHE = {}     # (w, h, ss) -> L-mode dot-lattice mask
 
@@ -632,11 +645,14 @@ def _load_font(px):
 # ----------------------------------------------------------------------------
 
 def render_view(facets, basis, scale, color, size=620, ss=2,
-                gray=False, labels=True, light=None):
+                gray=False, labels=True, light=None, palette=None):
     """Render one orthographic, flat-shaded panel as an RGB PIL image.
     light: optional unit vector overriding the global LIGHT -- pass an
     angled headlight (cam_dir tilted) so bottom/side views read as well
-    as the top (Loyd validation feedback 2026-07-14)."""
+    as the top (Loyd validation feedback 2026-07-14).
+    palette: optional {tier_key: (r,g,b)} from tier_palette(), which
+    colours each facet by its tier instead of by the material and takes
+    precedence over both `color` and `gray`."""
     right, up, forward, cam_dir = basis
     base_col = np.array((0.82, 0.82, 0.82) if gray else color, dtype=float)
 
@@ -664,17 +680,30 @@ def render_view(facets, basis, scale, color, size=620, ss=2,
         sy = verts @ up
         depth = float(np.mean(verts @ forward))
 
+        col = base_col
+        tinted = False
+        if palette is not None:
+            hit = palette.get(tier_key(f))
+            if hit is not None:
+                col, tinted = np.asarray(hit, dtype=float), True
+
         lam = max(0.0, float(np.dot(n, lgt)))
         frosted = f.get("frosting") is not None
-        if frosted:
+        if tinted:
+            # Flatter than the material shading, and no highlight: here the
+            # hue carries the information, and the full ambient-to-lit swing
+            # darkens a facing-away facet until two tiers are one colour.
+            # Enough shading remains to keep the facets apart as shapes.
+            rgb = col * (TINT_AMBIENT + TINT_DIFFUSE * lam)
+        elif frosted:
             # matte: no specular highlight, softened diffuse - a frosted
             # facet scatters instead of reflecting
-            rgb = base_col * (AMBIENT + 0.72 * DIFFUSE * lam + 0.10)
+            rgb = col * (AMBIENT + 0.72 * DIFFUSE * lam + 0.10)
         else:
             spec = SPEC_K * (max(0.0, float(np.dot(n, halfway))) ** SHININESS)
-            rgb = base_col * (AMBIENT + DIFFUSE * lam) + spec
+            rgb = col * (AMBIENT + DIFFUSE * lam) + spec
         rgb = tuple(int(np.clip(c * 255, 0, 255)) for c in rgb)
-        drawables.append((depth, sx, sy, rgb, f["tier"], frosted))
+        drawables.append((depth, sx, sy, rgb, f["tier"], frosted, col))
 
     if not drawables:
         # Not necessarily a fault.  A preform is cut girdle-first and has no
@@ -701,8 +730,8 @@ def render_view(facets, basis, scale, color, size=620, ss=2,
     edge = max(1, int(round(1.1 * ss)))
 
     # facet whose name we will print: largest visible facet per tier
-    best = {}   # tier -> (area, cx_px, cy_px)
-    for _, sx, sy, rgb, tier, frosted in drawables:
+    best = {}   # tier -> (area, cx_px, cy_px, unshaded tier colour)
+    for _, sx, sy, rgb, tier, frosted, col in drawables:
         px, py = to_px(sx, sy)
         pts = list(zip(px.tolist(), py.tolist()))
         d.polygon(pts, fill=rgb,
@@ -712,14 +741,22 @@ def render_view(facets, basis, scale, color, size=620, ss=2,
         if labels and tier:
             area = _poly_area(px, py)
             if tier not in best or area > best[tier][0]:
-                best[tier] = (area, float(px.mean()), float(py.mean()))
+                best[tier] = (area, float(px.mean()), float(py.mean()), col)
 
     if labels and best:
         font = _load_font(int(17 * ss))
-        for tier, (_, lx, ly) in best.items():
-            d.text((lx, ly), tier, fill=(245, 245, 245), font=font,
+        for tier, (_, lx, ly, col) in best.items():
+            if palette is None:
+                fill, stroke = (245, 245, 245), (0, 0, 0)
+            else:
+                # name the tier in its own colour, darkened until it reads
+                # on its (pale) facet, over a light stroke so it survives
+                # landing on a facet that is deep in shadow
+                fill = tuple(int(np.clip(c * 255 * 0.42, 0, 255)) for c in col)
+                stroke = (245, 245, 245)
+            d.text((lx, ly), tier, fill=fill, font=font,
                    anchor="mm", stroke_width=max(1, int(2 * ss)),
-                   stroke_fill=(0, 0, 0))
+                   stroke_fill=stroke)
 
     return img.resize((size, size), Image.LANCZOS)
 
@@ -727,6 +764,39 @@ def render_view(facets, basis, scale, color, size=620, ss=2,
 # ----------------------------------------------------------------------------
 # Composite of the four panels
 # ----------------------------------------------------------------------------
+
+def tier_key(facet):
+    """What makes two facets the same tier.
+
+    Both halves are needed.  Some designs give two tiers the SAME NAME, so
+    the name alone merges tiers that were cut separately; and a caller that
+    builds facets by hand may reuse a tier id across differently named
+    tiers, which the id alone merges.  Every real file already numbers its
+    tiers uniquely - parse_gcs counts <tier> elements and parse_gem starts a
+    new id at each name change - so this pair splits nothing that tid alone
+    did not.  Shared by tier_table() and tier_palette(), so a colour and its
+    row in the cutting table can never disagree about what a tier is."""
+    return (facet.get("tid"), facet.get("tier", ""))
+
+
+def tier_palette(facets, sat=0.34, val=1.0):
+    """A distinct pastel colour per tier: {tier_key: (r, g, b) in 0..1}.
+
+    For reading the cutting order off the stone rather than judging its
+    material colour - which tier is that facet, and did the tier I just cut
+    land where I meant it to.  Hues step by the golden angle, so adjacent
+    tiers (the ones most easily confused) never land on neighbouring hues
+    and a stone with forty tiers still separates.  Pale and unsaturated so
+    the shading still reads as shape: these are labels, not paint."""
+    order = []
+    for f in facets:
+        k = tier_key(f)
+        if k not in order:
+            order.append(k)
+    step = 0.6180339887498949                  # golden angle, in turns
+    return {k: colorsys.hsv_to_rgb((i * step) % 1.0, sat, val)
+            for i, k in enumerate(order)}
+
 
 PANEL_LABELS = ("Table (top)", "Pavilion (bottom)", "Side", "3/4 view")
 
@@ -795,7 +865,8 @@ def _fit_text(font, text, maxw, keep=8):
     return out
 
 
-def make_panels(facets, scale, color, angles34, size, ss, gray, labels):
+def make_panels(facets, scale, color, angles34, size, ss, gray, labels,
+                palette=None):
     # az=180 below: GCS presents its pavilion view flipped about the
     # VERTICAL axis (index 0 stays at the top, indices run CCW), so
     # match it rather than the 0-at-bottom horizontal-axis flip
@@ -804,7 +875,7 @@ def make_panels(facets, scale, color, angles34, size, ss, gray, labels):
              (view_basis(0, 0), None),
              (view_basis(*angles34), None)]
     return [render_view(facets, b, scale, color, size=size, ss=ss,
-                        gray=gray, labels=labels, light=lt)
+                        gray=gray, labels=labels, light=lt, palette=palette)
             for b, lt in specs]
 
 
@@ -835,7 +906,7 @@ def tier_table(facets, gear=96.0):
 
     groups = []
     for f in facets:
-        key = f.get("tid", f.get("tier", ""))
+        key = tier_key(f)
         if not groups or key != groups[-1][0]:
             groups.append((key, []))
         groups[-1][1].append(f)
@@ -1095,7 +1166,7 @@ def _unique_path(path):
 
 
 class ViewerApp:
-    def __init__(self, path, gray=False, labels=True):
+    def __init__(self, path, gray=False, labels=True, tier_colors=False):
         import tkinter as tk
         from PIL import ImageTk
         self.tk = tk
@@ -1104,6 +1175,7 @@ class ViewerApp:
         self.gray = gray
         self.labels = labels
         self.show_instr = True
+        self.tier_colors = tier_colors
         self.az, self.el = 35.0, 28.0
 
         self.panel = 460          # on-screen panel size
@@ -1119,6 +1191,21 @@ class ViewerApp:
         self.root.configure(bg="#1a1a1e")
         self.label = tk.Label(self.root, bg="#1a1a1e")
         self.label.pack()
+
+        # a checkbox rather than only a key, because this is a mode you sit
+        # in while reading a stone and its state should be visible without
+        # having to remember whether you pressed the key
+        controls = tk.Frame(self.root, bg="#1a1a1e")
+        controls.pack(fill="x", padx=PANEL_PAD)
+        self.tier_colors_var = tk.IntVar(value=int(self.tier_colors))
+        self.tier_check = tk.Checkbutton(
+            controls, text="Colour-code tiers", variable=self.tier_colors_var,
+            command=self._toggle_tier_colors, bg="#1a1a1e", fg="#c8c8d0",
+            activebackground="#1a1a1e", activeforeground="#e8e8f0",
+            selectcolor="#33333a", highlightthickness=0, bd=0,
+            font=("Segoe UI", 10), takefocus=0)
+        self.tier_check.pack(side="left")
+
         self.status = tk.Label(self.root, bg="#1a1a1e", fg="#9a9aa2",
                                font=("Segoe UI", 10), pady=4)
         self.status.pack(fill="x")
@@ -1137,6 +1224,7 @@ class ViewerApp:
         self.root.bind("<Down>",  lambda e: self._nudge(0, -6))
         self.root.bind("<Prior>", lambda e: self._step_file(-1))  # PageUp
         self.root.bind("<Next>",  lambda e: self._step_file(1))   # PageDown
+        self.root.bind("c", lambda e: self._toggle_tier_colors(flip=True))
         self.root.bind("g", lambda e: self._toggle("gray"))
         self.root.bind("l", lambda e: self._toggle("labels"))
         self.root.bind("i", lambda e: self._toggle_instr())
@@ -1158,6 +1246,9 @@ class ViewerApp:
         self.info = info
         self.color = material["color"]
         self.scale = world_scale(facets)
+        # per design: stepping to the next stone must recolour, or tier 3 of
+        # this design would wear the colour of tier 3 of the last one
+        self.palette = tier_palette(facets)
 
     _natural_key = staticmethod(natural_key)
 
@@ -1193,21 +1284,26 @@ class ViewerApp:
         self._set_status()
 
     # -- rendering helpers --
+    def _palette(self):
+        return self.palette if self.tier_colors else None
+
     def _render_static(self):
+        pal = self._palette()
         self.p_top = render_view(self.facets, view_basis(0, 90), self.scale,
                                  self.color, self.panel, self.ss_static,
-                                 self.gray, self.labels)
+                                 self.gray, self.labels, palette=pal)
         self.p_pav = render_view(self.facets, view_basis(180, -90), self.scale,
                                  self.color, self.panel, self.ss_static,
-                                 self.gray, self.labels, light=LIGHT_BELOW)
+                                 self.gray, self.labels, light=LIGHT_BELOW,
+                                 palette=pal)
         self.p_side = render_view(self.facets, view_basis(0, 0), self.scale,
                                   self.color, self.panel, self.ss_static,
-                                  self.gray, self.labels)
+                                  self.gray, self.labels, palette=pal)
 
     def _render_dynamic(self, ss):
         self.p_34 = render_view(self.facets, view_basis(self.az, self.el),
                                 self.scale, self.color, self.panel, ss,
-                                self.gray, self.labels)
+                                self.gray, self.labels, palette=self._palette())
 
     def _composite_and_show(self):
         instr_img = None
@@ -1231,7 +1327,8 @@ class ViewerApp:
             pos = f"file {idx + 1} / {len(files)}"
             message = (f"{pos}   ← → prev / next file   •   "
                        "drag to spin   •   ↑ ↓ tilt   •   "
-                       "I instructions   G gray   L labels   S save   R reset   Esc quit")
+                       "I instructions   C colours   G gray   L labels   "
+                       "S save   R reset   Esc quit")
         self.status.configure(text=message)
 
     # -- event handlers --
@@ -1258,6 +1355,25 @@ class ViewerApp:
 
     def _toggle(self, what):
         setattr(self, what, not getattr(self, what))
+        if what == "gray" and self.gray and self.tier_colors:
+            # grayscale and tier colours both claim the facet colour; the
+            # one just asked for wins, and the checkbox says so
+            self.tier_colors = False
+            self.tier_colors_var.set(0)
+        self._render_static()
+        self._render_dynamic(self.ss_static)
+        self._composite_and_show()
+
+    def _toggle_tier_colors(self, flip=False):
+        """The checkbox command, and the C key.
+
+        Tk has already flipped the variable when the checkbox itself was
+        clicked; the key press has to flip it first, hence `flip`."""
+        if flip:
+            self.tier_colors_var.set(0 if self.tier_colors_var.get() else 1)
+        self.tier_colors = bool(self.tier_colors_var.get())
+        if self.tier_colors and self.gray:
+            self.gray = False              # see _toggle: last request wins
         self._render_static()
         self._render_dynamic(self.ss_static)
         self._composite_and_show()
@@ -1278,7 +1394,8 @@ class ViewerApp:
         out = _unique_path(os.path.splitext(self.path)[0] + "_views.png")
         panels = make_panels(self.facets, self.scale, self.color,
                              (self.az, self.el), size=680, ss=3,
-                             gray=self.gray, labels=self.labels)
+                             gray=self.gray, labels=self.labels,
+                             palette=self._palette())
         instr_img = None
         if self.show_instr:
             rows = tier_table(self.facets, gear=self.info.get("gear", 96.0))
@@ -1525,6 +1642,7 @@ def main(argv):
 
     gray = "--gray" in flags
     labels = "--no-labels" not in flags
+    tier_colors = "--tier-colors" in flags
 
     if "--save" in flags:
         try:
@@ -1543,7 +1661,9 @@ def main(argv):
             out = _unique_path(os.path.splitext(path)[0] + "_views.png")
         scale = world_scale(facets)
         panels = make_panels(facets, scale, material["color"], (35, 28),
-                             size=680, ss=3, gray=gray, labels=labels)
+                             size=680, ss=3, gray=gray, labels=labels,
+                             palette=tier_palette(facets) if tier_colors
+                             else None)
         rows = tier_table(facets, gear=info.get("gear", 96.0))
         instr_img = render_instructions(rows, width=instr_width(680), gray=gray)
         try:
@@ -1555,7 +1675,8 @@ def main(argv):
         return 0
 
     try:
-        ViewerApp(path, gray=gray, labels=labels).run()
+        ViewerApp(path, gray=gray, labels=labels,
+                  tier_colors=tier_colors).run()
     except Exception as e:
         _error_window(f"Could not read:\n{os.path.basename(path)}\n\n{e}")
         return 1

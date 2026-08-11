@@ -5,6 +5,30 @@ Every release is built, self-tested and published by
 publish a tag that disagrees with `__version__` and refuses to ship an
 executable whose frozen code does not match the committed source.
 
+## 1.0.34
+
+- **Colour-code tiers**, from a checkbox under the views or the **C** key.
+  Every facet is painted by the tier it belongs to instead of by the
+  material — each tier its own pastel, named on the stone in its own colour.
+  It answers a different question from the material view: which facets belong
+  to the tier you are about to cut, and whether the one you just cut landed
+  where you meant it. `--tier-colors` does the same for a saved sheet.
+- Shading is deliberately flatter in that mode (and drops the highlight):
+  under the material constants a facet turned away from the light darkens
+  until two tiers read as one colour, which defeats the point of colouring
+  them. Enough shading remains to keep the facets apart as shapes.
+- Hues step by the golden angle, so tiers cut one after another — the ones
+  most easily confused — never land on neighbouring hues, and a stone with
+  forty tiers still separates. The colours are the same every run, so two
+  sheets of the same design can be compared, and they are recomputed per
+  design, so stepping through a folder never carries a colour across.
+- `tier_key()` now says what makes two facets the same tier, and both the
+  cutting table and the palette use it — a colour and its row cannot disagree
+  about where one tier ends. It pairs the tier id with the name: some designs
+  name two tiers alike, and a caller building facets by hand may reuse an id.
+  Every real file already numbers its tiers uniquely, and 400 designs across
+  the reference collection group identically before and after.
+
 ## 1.0.33
 
 - Frosted facets render distinctly. Edge-frosting tools mark a matte facet

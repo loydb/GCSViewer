@@ -272,6 +272,15 @@ def main():
                       app.show_instr != before_instr, app.show_instr)
                 key("i")
 
+                before_tint = app.tier_colors
+                key("c")
+                check("keys: c toggles the tier colours",
+                      app.tier_colors != before_tint, app.tier_colors)
+                check("keys: c moves the checkbox with it",
+                      bool(app.tier_colors_var.get()) == app.tier_colors,
+                      app.tier_colors_var.get())
+                key("c")
+
                 app.az = 111.0
                 key("r")
                 check("keys: r resets the 3/4 angle", app.az == 35.0, app.az)
@@ -280,6 +289,48 @@ def main():
                 key("<Up>")
                 check("keys: Up tilts the view", app.el != el_before, app.el)
                 key("<Down>")
+            app.root.withdraw()
+
+            # -- the tier-colour checkbox --
+            # it is the control the user actually clicks, so drive the widget
+            # rather than the method behind it
+            check("colours: the window offers a checkbox for them",
+                  app.tier_check.winfo_exists() and
+                  "olour" in app.tier_check.cget("text"),
+                  app.tier_check.cget("text"))
+            check("colours: it starts off", app.tier_colors is False)
+            plain = app._canvas.copy()
+            app.tier_check.invoke()
+            pump(app)
+            check("colours: ticking it turns them on", app.tier_colors is True)
+            check("colours: and the stone is redrawn",
+                  list(app._canvas.getdata()) != list(plain.getdata()))
+            check("colours: every tier gets its own",
+                  len(set(map(tuple, app.palette.values()))) ==
+                  len(app.palette) and len(app.palette) > 1,
+                  len(app.palette))
+
+            # grayscale and tier colours both claim the facet colour: the one
+            # asked for last wins, and the checkbox must not lie about it
+            key = lambda k: (app.root.event_generate(
+                "<KeyPress-%s>" % k), pump(app))
+            app.root.deiconify()
+            app.root.focus_force()
+            pump(app)
+            app._toggle("gray")
+            pump(app)
+            check("colours: turning on gray turns them off",
+                  app.gray is True and app.tier_colors is False,
+                  (app.gray, app.tier_colors))
+            check("colours: and unticks the checkbox",
+                  app.tier_colors_var.get() == 0, app.tier_colors_var.get())
+            app.tier_check.invoke()
+            pump(app)
+            check("colours: ticking them back turns gray off",
+                  app.tier_colors is True and app.gray is False,
+                  (app.tier_colors, app.gray))
+            app.tier_check.invoke()                 # back to plain for saving
+            pump(app)
             app.root.withdraw()
 
             # -- saving --
