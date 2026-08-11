@@ -51,6 +51,10 @@ executable whose frozen code does not match the committed source.
   name two tiers alike, and a caller building facets by hand may reuse an id.
   Every real file already numbers its tiers uniquely, and 400 designs across
   the reference collection group identically before and after.
+- The README animation is regenerated, and now ticks and unticks the checkbox
+  as it turns the stone — the two things about the window that a still picture
+  cannot say. It draws the control row into the seam `compose(split=True)`
+  leaves, which is the same gap the window packs the real widget into.
 
 ## 1.0.33
 

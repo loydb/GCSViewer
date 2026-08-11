@@ -14,10 +14,11 @@ If you open designs all day, take the **folder build** from the
 it starts in a third of the time (427 ms against 1,534 ms), because the single
 file unpacks itself into `%TEMP%` on every launch.
 
-![the demo stone in the viewer — table, pavilion and side views beside a 3/4 view being turned on both axes, above the cutting instructions](docs/demo-turn.webp)
+![the demo stone in the viewer — table, pavilion and side views beside a 3/4 view being turned on both axes, above the cutting instructions, with the colour-code tiers checkbox being ticked and unticked](docs/demo-turn.webp)
 
 *`docs/demo.gcs`, opened in the viewer. The last panel is live: drag to turn
-the stone, arrow keys to tip it.*
+the stone, arrow keys to tip it. The checkbox under the panels swaps the
+material colour for a colour per tier.*
 
 ## Why
 
