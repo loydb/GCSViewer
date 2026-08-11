@@ -4,8 +4,9 @@ GCS Viewer - render a Gemcut Studio (.gcs) faceted gem.
 
 Author - Loyd Blankenship, but mostly Claude Code...
 
-Shows four flat-shaded renders of the stone, tinted with the material
-colour stored in the file:
+Shows four flat-shaded renders of the stone - by default coloured a
+tier at a time (see the checkbox below), or tinted with the material
+colour the file stores:
   - "Table (top)"       : looking straight down the optic axis at the table
   - "Pavilion (bottom)" : straight up at the culet, lit from below
   - "Side"              : the girdle profile
@@ -104,7 +105,10 @@ def _read_xml(path):
 def parse_gcs(path):
     """Return (facets, info, material).
 
-    facets   : list of {'verts': Nx3 array, 'normal': 3-array, 'tier': str}
+    facets   : list of {'verts': Nx3 array, 'normal': 3-array,
+               'tier': str (the file's own name), 'instr': str,
+               'tid': int (tier number within the file),
+               'frosting': float or None}
     info     : dict from the <info> element
     material : dict with 'color' (r,g,b in 0..1) and any render attributes
     """
@@ -455,9 +459,10 @@ def write_gcs(path, facets, info, material, gear=96):
         # Every distinct step in the tier, not just the one the tier opens
         # with.  A .gem puts the instruction on the facet that *begins* a
         # cutting step and a tier can hold several, so taking facets[i] alone
-        # dropped later steps on conversion - 332 of the .gem files in the
-        # reference collection lost at least one.  Repeats collapse, so a
-        # .gcs (one instruction repeated across its tier) is unchanged.
+        # dropped later steps on conversion - 322 of the 1,103 .gem files in
+        # the reference collection hold such a tier, 840 steps in all
+        # (re-measured 2026-08-11).  Repeats collapse, so a .gcs (one
+        # instruction repeated across its tier) is unchanged.
         steps = []
         for f in facets[i:i + run_len]:
             s = (f.get("instr", "") or "").strip()
@@ -783,8 +788,10 @@ def tier_key(facet):
     tiers, which the id alone merges.  Every real file already numbers its
     tiers uniquely - parse_gcs counts <tier> elements and parse_gem starts a
     new id at each name change - so this pair splits nothing that tid alone
-    did not.  Shared by tier_table() and tier_palette(), so a colour and its
-    row in the cutting table can never disagree about what a tier is."""
+    did not.  Everything that groups facets into tiers goes through it -
+    tier_groups(), tier_labels(), tier_palette() and the captions in
+    render_view() - so a colour, a label and a row in the cutting table
+    can never disagree about what a tier is."""
     return (facet.get("tid"), facet.get("tier", ""))
 
 
@@ -1002,10 +1009,11 @@ def tier_table(facets, gear=96.0):
         # A .gem stores the instruction on the facet that starts a cutting
         # step, and a tier can contain several steps - "Match g1, establish
         # upper girdle line" and then "Meet g1.a.a.g1" both live in tier a of
-        # Alcyone.  Taking only the first facet's text dropped 144 lines
-        # across 56 of the 245 .gem files in the collection.  Order is
-        # preserved and repeats collapse, so a .gcs - which repeats one tier
-        # instruction across every facet - is unaffected.
+        # Alcyone.  Taking only the first facet's text drops every step but
+        # the first: 322 of the 1,103 .gem files in the reference collection
+        # hold a multi-step tier, 840 steps in all (re-measured 2026-08-11).
+        # Order is preserved and repeats collapse, so a .gcs - which repeats
+        # one tier instruction across every facet - is unaffected.
         instrs = []
         for f in grp:
             s = (f.get("instr", "") or "").strip()
@@ -1477,7 +1485,8 @@ class ViewerApp:
         self._composite_and_show()
 
     def _toggle_instr(self):
-        # only the composite changes (no re-render); window width changes
+        # only the composite changes (no re-render); the table strip
+        # grows and shrinks, so the window height does too
         self.show_instr = not self.show_instr
         self._composite_and_show()
         self.root.update_idletasks()
@@ -1635,8 +1644,9 @@ def _selftest(report_path=None):
 
     This exists for the frozen .exe, which can look perfectly healthy and
     still be missing Pillow's PNG encoder or its font handling.  It touches
-    the whole chain - write_gcs, parse_gcs, tier_table, render_view, compose,
-    save - without needing a design file on disk.
+    the whole chain - write_gcs, parse_gcs, tier_table, tier_labels,
+    make_panels, render_view, compose, save - without needing a design file
+    on disk.
     """
     import tempfile
     import traceback

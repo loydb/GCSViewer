@@ -23,7 +23,6 @@ executable whose frozen code does not match the committed source.
 - `tier_groups()` now does the grouping and the geometry once, and the labels,
   the section headings and the table rows all read it, so they cannot disagree
   about where one tier ends or what part of the stone it is on.
-
 - **Colour-code tiers**, from a checkbox above the cutting instructions or the
   **C** key, **on when the window opens**. Every facet is painted by the tier
   it belongs to instead of by the material — each tier its own pastel, named
@@ -308,8 +307,8 @@ them were stale *code*, not stale prose:
 ## 1.0.12
 
 - **Converting a `.gem` no longer drops cutting steps.** `write_gcs` wrote the
-  instruction the tier opens with and discarded the rest; 332 of the `.gem`
-  files in the reference collection lost at least one. It now joins the
+  instruction the tier opens with and discarded the rest; 332 files in the
+  reference collection lost at least one. It now joins the
   distinct steps into the single string the format allows, the same way the
   table displays them.
 

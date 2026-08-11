@@ -38,7 +38,7 @@ it and refuses to publish a mismatch.
 
 ```bash
 python scripts/make_demo.py         # docs/demo.gcs and docs/demo.png
-python scripts/make_demo_anim.py    # the animation at the top of this page
+python scripts/make_demo_anim.py    # the animation at the top of the README
 python scripts/gen_icon.py          # docs/gcsviewer.ico
 python scripts/check_demo.py        # the committed stone matches its generator
 ```
@@ -104,8 +104,10 @@ synthetic suite could not, all fixed:
   216 — Fleur en rêve* made the whole file malformed XML. The reader now falls
   back through the Windows code pages.
 - **Cutting steps were dropped.** In a `.gem` the instruction belongs to the
-  facet that *begins* a step and a tier can hold several: 144 lines lost across
-  56 of 245 files.
+  facet that *begins* a step and a tier can hold several, so reading only the
+  first lost the rest. Re-measured 2026-08-11 against the collection as it
+  stands: **322 of its 1,103 `.gem` files** hold such a tier, **840 steps** in
+  all.
 - **`write_gcs` merged tiers sharing a name** — one design went from seven
   tiers to one. Boundaries now follow the element, not the label.
 - **Zero-byte files reported a parser error** rather than saying they were

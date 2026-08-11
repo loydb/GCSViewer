@@ -34,7 +34,9 @@ You work in the terms a faceter actually cuts to — tiers, angles, index gear �
 and see the finished stone rendered as you go, so a design can be judged on
 screen before anything is ground against a lap. Its designs are the `.gcs`
 files this viewer opens, and the tier / angle / index table under the renders
-is the same vocabulary as its cutting-sequence panel.
+is the same vocabulary as its cutting-sequence panel — though the tier names
+here are derived rather than copied, so they may not match the ones a design
+was written with (see below).
 
 GCS Viewer is an independent tool. It is not affiliated with Gem Cut Studio or
 GemCad, it only reads their files, and it never modifies what it opens.
@@ -75,9 +77,10 @@ A panel with nothing facing it says so, which is not always a fault — a prefor
 has no crown yet, so there is genuinely nothing to draw from above.
 
 Rendering is deliberately flat and matte: a painter's algorithm with back-face
-culling, one fixed light and a specular highlight. No refraction, no
-dispersion. Flat shading shows the facets, and a meet that does not meet stays
-visible instead of disappearing into a sparkle.
+culling, a fixed light — mirrored below the girdle for the pavilion panel, which
+would otherwise sit in its own shadow — and a specular highlight. No refraction,
+no dispersion. Flat shading shows the facets, and a meet that does not meet
+stays visible instead of disappearing into a sparkle.
 
 **Colour-code tiers** — the checkbox above the cutting instructions, or **C** —
 paints every facet by the tier it belongs to instead of by the material, each
