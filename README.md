@@ -67,14 +67,19 @@ culling, one fixed light and a specular highlight. No refraction, no
 dispersion. Flat shading shows the facets, and a meet that does not meet stays
 visible instead of disappearing into a sparkle.
 
-**Colour-code tiers** — the checkbox under the views, or **C** — repaints every
-facet by the tier it belongs to instead of by the material, each tier its own
-pastel, named in its own colour. It answers a different question from the
-material view: not what the stone will look like, but which facets belong to
-the tier you are about to cut, and whether the one you just cut landed where
-you meant it to. Shading is flatter in this mode so a tier stays the same
-colour on the facets turned away from the light. Every design gets its own
-colours, and they do not change between runs.
+**Colour-code tiers** — the checkbox above the cutting instructions, or **C** —
+paints every facet by the tier it belongs to instead of by the material, each
+tier its own pastel, named in its own colour. It answers a different question
+from the material view: not what the stone will look like, but which facets
+belong to the tier you are about to cut, and whether the one you just cut
+landed where you meant it to. Shading is flatter in this mode so a tier stays
+the same colour on the facets turned away from the light. Every design gets
+its own colours, and they do not change between runs.
+
+The window opens with them on; untick the box, or start with
+`--no-tier-colors`, for the material colour the file names. A saved sheet is
+the other way round — it follows the window when you press **S**, and stays
+on the material colours for `--save` unless you ask with `--tier-colors`.
 
 **Frosted facets** — the matte bands an edge-frosting tool leaves — draw
 without the highlight and under a fine stipple, so they are distinguishable
@@ -104,7 +109,7 @@ There is no `.asc` support, by design.
 | **drag** | turn the 3/4 view left and right |
 | **↑ ↓** | tip the 3/4 view up and down |
 | **I** | show / hide the instructions table |
-| **C** | colour-code the tiers (also the checkbox under the views) |
+| **C** | colour-code the tiers, on at startup (also the checkbox above the table) |
 | **G** | grayscale |
 | **L** | tier labels |
 | **S** | save the sheet as a PNG next to the design |

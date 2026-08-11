@@ -14,9 +14,9 @@ colour stored in the file:
 Facets carrying a frosting attribute (matte finish from edge-frosting
 tools) render flatter, without specular highlight, under a dot stipple.
 
-The "Colour-code tiers" checkbox (or the C key) repaints every facet by
-its tier instead of by the material, for reading the cutting order off
-the stone.
+The "Colour-code tiers" checkbox above the cutting table (or the C key)
+paints every facet by its tier instead of by the material, for reading
+the cutting order off the stone.  The window opens with it ticked.
 
 Left/Right arrows step through the other .gcs files in the same folder
 (wrapping around), like the Windows photo viewer.
@@ -27,7 +27,9 @@ Usage:
     python  gcs_viewer.py --selftest [report.txt]        # prove a build works
     python  gcs_viewer.py --version                      # which build is this
     Options: --gray  (grayscale)   --no-labels  (hide tier names)
-             --tier-colors  (a distinct colour per tier)
+             --tier-colors     (a colour per tier; on by default in the
+                                window, opt-in for --save)
+             --no-tier-colors  (open the window without them)
 
 Set GCS_VIEWER_NO_GUI=1 to make errors print to stderr instead of opening a
 message box, so unattended scripts cannot stall on a dialog.
@@ -1053,7 +1055,14 @@ def render_instructions_cached(rows, width, gray=False, keep=4):
 
 
 def compose(panels, info, src_name, panel, instr_img=None,
-            pad=16, header=54, footer=30):
+            pad=16, header=54, footer=30, split=False):
+    """The whole sheet: title, the panels with their captions, the cutting
+    table and the footer.
+
+    split=True returns it cut in two at the seam under the panels -
+    (renders, instructions) - so the window can put a control row between
+    them.  It is the same sheet, cropped, rather than a second layout:
+    laying it out twice is how the window and the saved PNG would drift."""
     n = len(panels)
     W = panel * n + pad * (n + 1)
     py = header + pad + 14                      # top of the render panels
@@ -1090,6 +1099,10 @@ def compose(panels, info, src_name, panel, instr_img=None,
     if text:
         d.text((pad, H - footer + 4), _fit_text(small_font, text, W - 2 * pad),
                fill=(165, 165, 170), font=small_font)
+
+    if split:
+        cut = py + panel + pad          # under the panels, above "Instructions"
+        return canvas.crop((0, 0, W, cut)), canvas.crop((0, cut, W, H))
     return canvas
 
 
@@ -1166,7 +1179,7 @@ def _unique_path(path):
 
 
 class ViewerApp:
-    def __init__(self, path, gray=False, labels=True, tier_colors=False):
+    def __init__(self, path, gray=False, labels=True, tier_colors=True):
         import tkinter as tk
         from PIL import ImageTk
         self.tk = tk
@@ -1189,6 +1202,9 @@ class ViewerApp:
         self.root.title(f"Gem Viewer {__version__}  -  "
                         f"{os.path.basename(self.path)}")
         self.root.configure(bg="#1a1a1e")
+        # the sheet is shown in two pieces - the renders, then the cutting
+        # table - so the control row can sit between them, on the seam the
+        # sheet already has
         self.label = tk.Label(self.root, bg="#1a1a1e")
         self.label.pack()
 
@@ -1196,7 +1212,7 @@ class ViewerApp:
         # in while reading a stone and its state should be visible without
         # having to remember whether you pressed the key
         controls = tk.Frame(self.root, bg="#1a1a1e")
-        controls.pack(fill="x", padx=PANEL_PAD)
+        controls.pack(fill="x", padx=PANEL_PAD + 4, pady=(5, 1))
         self.tier_colors_var = tk.IntVar(value=int(self.tier_colors))
         self.tier_check = tk.Checkbutton(
             controls, text="Colour-code tiers", variable=self.tier_colors_var,
@@ -1205,6 +1221,9 @@ class ViewerApp:
             selectcolor="#33333a", highlightthickness=0, bd=0,
             font=("Segoe UI", 10), takefocus=0)
         self.tier_check.pack(side="left")
+
+        self.instr_label = tk.Label(self.root, bg="#1a1a1e")
+        self.instr_label.pack()
 
         self.status = tk.Label(self.root, bg="#1a1a1e", fg="#9a9aa2",
                                font=("Segoe UI", 10), pady=4)
@@ -1311,12 +1330,16 @@ class ViewerApp:
             rows = tier_table(self.facets, gear=self.info.get("gear", 96.0))
             instr_img = render_instructions_cached(rows, instr_width(self.panel),
                                                    gray=self.gray)
-        canvas = compose([self.p_top, self.p_pav, self.p_side, self.p_34],
-                         self.info, self.path, self.panel, instr_img=instr_img)
-        self._canvas = canvas
-        photo = self.ImageTk.PhotoImage(canvas)
+        views, table = compose([self.p_top, self.p_pav, self.p_side, self.p_34],
+                               self.info, self.path, self.panel,
+                               instr_img=instr_img, split=True)
+        self._canvas, self._table_canvas = views, table
+        photo = self.ImageTk.PhotoImage(views)
         self.label.configure(image=photo)
         self.label.image = photo
+        table_photo = self.ImageTk.PhotoImage(table)
+        self.instr_label.configure(image=table_photo)
+        self.instr_label.image = table_photo
 
     def _set_status(self, message=None):
         if message is None:
@@ -1410,7 +1433,11 @@ class ViewerApp:
         self._set_status(f"Saved  {out}")
 
     def _center(self):
-        w, h = self._canvas.size
+        # ask the window what it wants to be: its height is the two image
+        # strips plus the control row and the status line, not one canvas
+        self.root.update_idletasks()
+        w = self.root.winfo_reqwidth()
+        h = self.root.winfo_reqheight()
         x = (self.root.winfo_screenwidth() - w) // 2
         y = (self.root.winfo_screenheight() - h) // 2 - 30
         self.root.geometry(f"+{max(0, x)}+{max(0, y)}")
@@ -1642,7 +1669,12 @@ def main(argv):
 
     gray = "--gray" in flags
     labels = "--no-labels" not in flags
-    tier_colors = "--tier-colors" in flags
+    # The window opens with the tiers coloured: reading a design is what it
+    # is for, and the colours answer "which facets are this tier" at a
+    # glance.  --save stays opt-in, so scripts that render sheets keep
+    # getting the material colours they have always got.
+    save_tint = "--tier-colors" in flags
+    window_tint = "--no-tier-colors" not in flags
 
     if "--save" in flags:
         try:
@@ -1662,7 +1694,7 @@ def main(argv):
         scale = world_scale(facets)
         panels = make_panels(facets, scale, material["color"], (35, 28),
                              size=680, ss=3, gray=gray, labels=labels,
-                             palette=tier_palette(facets) if tier_colors
+                             palette=tier_palette(facets) if save_tint
                              else None)
         rows = tier_table(facets, gear=info.get("gear", 96.0))
         instr_img = render_instructions(rows, width=instr_width(680), gray=gray)
@@ -1676,7 +1708,7 @@ def main(argv):
 
     try:
         ViewerApp(path, gray=gray, labels=labels,
-                  tier_colors=tier_colors).run()
+                  tier_colors=window_tint).run()
     except Exception as e:
         _error_window(f"Could not read:\n{os.path.basename(path)}\n\n{e}")
         return 1

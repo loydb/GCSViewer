@@ -107,6 +107,19 @@ def main():
                   "stone1.gcs" in app.root.title(), app.root.title())
             check("window: an image is on screen",
                   app.label.cget("image") != "", app.label.cget("image"))
+            check("window: the cutting table is its own strip below it",
+                  app.instr_label.cget("image") != "" and
+                  app.instr_label.winfo_manager() == "pack",
+                  app.instr_label.cget("image"))
+            check("window: the checkbox sits between them",
+                  list(app.root.pack_slaves()).index(app.tier_check.master) ==
+                  list(app.root.pack_slaves()).index(app.label) + 1 and
+                  list(app.root.pack_slaves()).index(app.instr_label) ==
+                  list(app.root.pack_slaves()).index(app.tier_check.master) + 1,
+                  [w.winfo_class() for w in app.root.pack_slaves()])
+            check("window: it opens with the tiers coloured",
+                  app.tier_colors is True and app.tier_colors_var.get() == 1,
+                  (app.tier_colors, app.tier_colors_var.get()))
             check("window: the four panels and the table were composed",
                   app._canvas.width >= app.panel * 4, app._canvas.size)
 
@@ -195,16 +208,23 @@ def main():
                   app._canvas is not None)
 
             # -- toggles --
-            before = app._canvas.height
+            # the sheet is shown as two strips with the controls between, so
+            # it is the lower one that grows and shrinks with the table
+            before = app._table_canvas.height
+            views_before = app._canvas.height
             app._toggle_instr()
             pump(app)
             check("I: hiding the table makes the sheet shorter",
-                  app._canvas.height < before, (before, app._canvas.height))
+                  app._table_canvas.height < before,
+                  (before, app._table_canvas.height))
+            check("I: the renders above it do not move",
+                  app._canvas.height == views_before,
+                  (views_before, app._canvas.height))
             app._toggle_instr()
             pump(app)
             check("I: showing it again restores the height",
-                  app._canvas.height == before,
-                  (before, app._canvas.height))
+                  app._table_canvas.height == before,
+                  (before, app._table_canvas.height))
 
             app._toggle("gray")
             pump(app)
@@ -298,7 +318,14 @@ def main():
                   app.tier_check.winfo_exists() and
                   "olour" in app.tier_check.cget("text"),
                   app.tier_check.cget("text"))
-            check("colours: it starts off", app.tier_colors is False)
+            # earlier checks in this run have toggled gray, which turns the
+            # colours off - so put the state where this block needs it rather
+            # than assuming it (asserting "starts off" here passed for a while
+            # on that leftover state, testing nothing)
+            if app.tier_colors:
+                app.tier_check.invoke()
+                pump(app)
+            check("colours: they can be turned off", app.tier_colors is False)
             plain = app._canvas.copy()
             app.tier_check.invoke()
             pump(app)

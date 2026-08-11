@@ -1105,6 +1105,25 @@ def test_compose():
     check("compose: the table spans the panels exactly",
           sheet.width - 2 * gv.PANEL_PAD == gv.instr_width(160),
           (sheet.width, gv.instr_width(160)))
+    # the window shows the sheet as two strips with a control row between
+    # them.  They must be the SAME sheet, cut - a second layout for the
+    # window is how the two would drift apart.
+    whole = gv.compose(panels, {"title": "x"}, "x.gcs", 160, instr_img=instr)
+    views, table = gv.compose(panels, {"title": "x"}, "x.gcs", 160,
+                              instr_img=instr, split=True)
+    check("compose: the split halves are the whole sheet",
+          views.width == table.width == whole.width and
+          views.height + table.height == whole.height,
+          ((views.size, table.size), whole.size))
+    rejoined = gv.Image.new("RGB", whole.size)
+    rejoined.paste(views, (0, 0))
+    rejoined.paste(table, (0, views.height))
+    check("compose: and pixel-identical when put back together",
+          list(rejoined.getdata()) == list(whole.getdata()))
+    check("compose: the cut is below the renders",
+          views.height > 160 and table.height > 20,
+          (views.height, table.height))
+
     check("compose: instr_width tracks the panel count",
           gv.instr_width(100, n=3) == 100 * 3 + 32
           and gv.instr_width(100, n=4) == 100 * 4 + 48,

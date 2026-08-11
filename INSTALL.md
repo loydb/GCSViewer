@@ -60,7 +60,7 @@ On first launch SmartScreen may ask about running an unsigned program — click
 | **drag** | turn the 3/4 view left and right |
 | **↑ ↓** | tip it up and down |
 | **I** | show / hide the instructions table |
-| **C** | colour-code the tiers — also the checkbox under the views |
+| **C** | colour-code the tiers — the checkbox above the instructions; on at startup |
 | **G** | grayscale |
 | **L** | tier labels (T, C1, P1, …) |
 | **S** | save the sheet as a PNG next to the design |
@@ -81,6 +81,7 @@ no crown yet, so there is nothing to draw from above.
 .\GCSViewer.exe "C:\path\to\stone.gcs" --save             # write a PNG, no window
 .\GCSViewer.exe "C:\path\to\stone.gcs" --save --gray --no-labels
 .\GCSViewer.exe "C:\path\to\stone.gcs" --save --tier-colors   # a colour per tier
+.\GCSViewer.exe "C:\path\to\stone.gcs" --no-tier-colors       # window, material colour
 .\GCSViewer.exe --version                                 # which build is this
 .\GCSViewer.exe --selftest report.txt                     # check the program is intact
 ```

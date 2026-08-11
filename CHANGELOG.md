@@ -7,12 +7,19 @@ executable whose frozen code does not match the committed source.
 
 ## 1.0.34
 
-- **Colour-code tiers**, from a checkbox under the views or the **C** key.
-  Every facet is painted by the tier it belongs to instead of by the
-  material — each tier its own pastel, named on the stone in its own colour.
-  It answers a different question from the material view: which facets belong
-  to the tier you are about to cut, and whether the one you just cut landed
-  where you meant it. `--tier-colors` does the same for a saved sheet.
+- **Colour-code tiers**, from a checkbox above the cutting instructions or the
+  **C** key, **on when the window opens**. Every facet is painted by the tier
+  it belongs to instead of by the material — each tier its own pastel, named
+  on the stone in its own colour. It answers a different question from the
+  material view: which facets belong to the tier you are about to cut, and
+  whether the one you just cut landed where you meant it. `--no-tier-colors`
+  opens without them; `--tier-colors` puts them on a `--save`d sheet, which
+  otherwise keeps the material colours it has always had.
+- The window now shows the sheet as two strips — the renders, then the cutting
+  table — so the checkbox can sit on the seam between them. They are the same
+  composed sheet, cropped, not a second layout: a check asserts the halves are
+  pixel-identical to the whole, because a separate window layout is how the
+  window and the saved PNG would drift apart.
 - Shading is deliberately flatter in that mode (and drops the highlight):
   under the material constants a facet turned away from the light darkens
   until two tiers read as one colour, which defeats the point of colouring
