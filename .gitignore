@@ -15,11 +15,13 @@ __pycache__/
 # personal notes, the superseded C# launcher, and the archived 2026-06-10 exe
 local/
 
-# design files and renders - the only ones the repo carries are its own demo
+# design files and renders - the only ones the repo carries are the generated
+# demo stone and Implaid, the author's own design, which illustrates the README
 *.gcs
 *.gem
 *.png
 !docs/demo.gcs
+!docs/Implaid.gcs
 !docs/demo.png
 !docs/icon-preview.png
 *_views.png

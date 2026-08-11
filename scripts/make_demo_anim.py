@@ -4,13 +4,17 @@ make_demo_anim.py - the README's illustration, with the stone turning.
 
     python scripts/make_demo_anim.py
 
-Writes docs/demo-turn.webp: the same sheet make_demo.py produces, except the
-3/4 panel turns - left and right, and up and down - and the "Colour-code
-tiers" checkbox is ticked and unticked as it runs.  A still picture of this
-program looks like a diagram; the two things that most need saying about the
-window are that the last panel can be grabbed and moved on both axes, and
-that one box swaps the material colour for a colour per tier.  Only an
-animation says either.
+Writes docs/demo-turn.webp: the sheet the window shows for docs/Implaid.gcs -
+a real design, cut and published by the author of this program, rather than
+the generated stone the icon and docs/demo.png are drawn from - except the
+3/4 panel turns, left and right and up and down, and the "Colour-code tiers"
+checkbox is ticked and unticked as it runs.  A still picture of this program
+looks like a diagram; the two things that most need saying about the window
+are that the last panel can be grabbed and moved on both axes, and that one
+box swaps the material colour for a colour per tier.  Only an animation says
+either.
+
+Pass a different design as the first argument to illustrate with that one.
 
 Only the 3/4 panel is re-rendered per frame.  The table, pavilion and side
 views are drawn once per colour mode and reused, and each frame is assembled
@@ -43,18 +47,17 @@ sys.path.insert(0, os.path.join(HERE, "scripts"))
 os.environ.setdefault("GCS_VIEWER_NO_GUI", "1")
 
 import gcs_viewer as gv
-from make_demo import build
 
+DESIGN = os.path.join(HERE, "docs", "Implaid.gcs")
 PANEL = 260           # on-screen panel size for each of the four views
 FRAMES = 48
 MS = 60               # ~2.9 s for the full loop
-COLOUR = (0.20, 0.55, 0.90)
 QUALITY = 72
 
-# Not a spin.  A continuous revolution of a sixteen-main round stone reads as
-# a shimmer, because the silhouette repeats every 22.5 degrees and barely
-# changes anyway - and it shows only one of the two axes you can drag.  This
-# turns it left and right *and* tips it up and down, the elevation a quarter
+# Not a spin.  A continuous revolution reads as a shimmer on a symmetrical
+# stone, because the silhouette repeats every quarter turn and barely changes
+# anyway - and it shows only one of the two axes you can drag.  This turns it
+# left and right *and* tips it up and down, the elevation a quarter
 # cycle out of phase with the azimuth so the viewpoint travels an ellipse
 # rather than sawing along a diagonal.  Both are sinusoidal, so the motion
 # eases at the extremes the way a hand does, and both return exactly to where
@@ -105,13 +108,13 @@ def draw_controls(width, checked, pointer=False):
     return strip
 
 
-def sheet(panels, info, instr, checked, pointer):
+def sheet(panels, info, src_name, instr, checked, pointer):
     """One frame: the sheet the window shows, control row and all.
 
     compose(split=True) hands back the same canvas cut at the seam under the
     panels, which is how the window gets the gap it packs the checkbox into.
     """
-    top_img, bottom_img = gv.compose(panels, info, "demo.gcs", PANEL,
+    top_img, bottom_img = gv.compose(panels, info, src_name, PANEL,
                                      instr_img=instr, split=True)
     strip = draw_controls(top_img.width, checked, pointer)
     frame = Image.new("RGB", (top_img.width,
@@ -122,10 +125,16 @@ def sheet(panels, info, instr, checked, pointer):
     return frame
 
 
-def main():
-    facets = build()
+def main(argv):
+    path = argv[1] if len(argv) > 1 else DESIGN
+    if not os.path.exists(path):
+        sys.exit("no design at %s" % path)
+    # read exactly as the application reads it - geometry, the heading and
+    # footer text, and the material colour the design was written with
+    facets, info, colour = gv.load_design(path)
+    src_name = os.path.basename(path)
+    material = colour["color"]
     scale = gv.world_scale(facets)
-    info = {"title": "Demo Stone - 16 Main Brilliant"}
 
     palette = gv.tier_palette(facets)
     names = gv.tier_labels(facets)
@@ -137,15 +146,15 @@ def main():
     for checked in (True, False):
         kw = {"palette": palette, "names": names} if checked else {}
         fixed[checked] = [
-            gv.render_view(facets, gv.view_basis(0, 90), scale, COLOUR,
+            gv.render_view(facets, gv.view_basis(0, 90), scale, material,
                            size=PANEL, ss=2, labels=True, **kw),
-            gv.render_view(facets, gv.view_basis(180, -90), scale, COLOUR,
+            gv.render_view(facets, gv.view_basis(180, -90), scale, material,
                            size=PANEL, ss=2, labels=True,
                            light=gv.LIGHT_BELOW, **kw),
-            gv.render_view(facets, gv.view_basis(0, 0), scale, COLOUR,
+            gv.render_view(facets, gv.view_basis(0, 0), scale, material,
                            size=PANEL, ss=2, labels=True, **kw),
         ]
-    rows = gv.tier_table(facets, gear=96)
+    rows = gv.tier_table(facets, gear=info.get("gear", 96.0))
     instr = gv.render_instructions(rows, width=gv.instr_width(PANEL))
 
     frames = []
@@ -156,10 +165,10 @@ def main():
         checked = sum(i >= f for f in TOGGLES) % 2 == 0
         pointer = any(abs(i - f) <= POINTER_LEAD for f in TOGGLES)
         kw = {"palette": palette, "names": names} if checked else {}
-        spun = gv.render_view(facets, gv.view_basis(az, el), scale, COLOUR,
+        spun = gv.render_view(facets, gv.view_basis(az, el), scale, material,
                               size=PANEL, ss=2, labels=True, **kw)
         # composed by the application's own layout code, not re-implemented
-        frames.append(sheet(fixed[checked] + [spun], info, instr,
+        frames.append(sheet(fixed[checked] + [spun], info, src_name, instr,
                             checked, pointer).convert("RGB"))
         sys.stdout.write("\r  rendered %d/%d" % (i + 1, FRAMES))
         sys.stdout.flush()
@@ -181,4 +190,4 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main(sys.argv))

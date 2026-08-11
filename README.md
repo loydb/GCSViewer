@@ -16,9 +16,9 @@ file unpacks itself into `%TEMP%` on every launch.
 
 ![the demo stone in the viewer — table, pavilion and side views beside a 3/4 view being turned on both axes, above the cutting instructions, with the colour-code tiers checkbox being ticked and unticked](docs/demo-turn.webp)
 
-*`docs/demo.gcs`, opened in the viewer. The last panel is live: drag to turn
-the stone, arrow keys to tip it. The checkbox under the panels swaps the
-material colour for a colour per tier.*
+*`docs/Implaid.gcs` — Implaid, a cushion by Loyd Blankenship — opened in the
+viewer. The last panel is live: drag to turn the stone, arrow keys to tip it.
+The checkbox under the panels swaps the material colour for a colour per tier.*
 
 ## Why
 

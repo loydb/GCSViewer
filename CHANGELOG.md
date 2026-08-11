@@ -55,6 +55,12 @@ executable whose frozen code does not match the committed source.
   as it turns the stone — the two things about the window that a still picture
   cannot say. It draws the control row into the seam `compose(split=True)`
   leaves, which is the same gap the window packs the real widget into.
+- It illustrates a real design now — `docs/Implaid.gcs`, a cushion by Loyd
+  Blankenship, with fifteen tiers and the instructions its designer wrote —
+  rather than the generated 16-main stone, which shows four tiers and carries
+  invented instruction text. A program for reading cutting instructions should
+  be pictured reading a design somebody cut. The generated stone still draws
+  the icon and `docs/demo.png`, which have to come from the generator alone.
 
 ## 1.0.33
 

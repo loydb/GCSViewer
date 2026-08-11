@@ -43,6 +43,13 @@ python scripts/gen_icon.py          # docs/gcsviewer.ico
 python scripts/check_demo.py        # the committed stone matches its generator
 ```
 
+The animation illustrates `docs/Implaid.gcs`, a real design rather than the
+generated stone — a program that shows cutting instructions should be shown
+reading a design somebody cut. Pass another design as the first argument to
+illustrate with that one. The generated stone is still what the icon and
+`docs/demo.png` are drawn from, and what `check_demo.py` checks, because
+those have to be reproducible from the generator alone.
+
 ![the icon at 16, 24, 32, 48, 64, 128 and 256 pixels](docs/icon-preview.png)
 
 The icon is the demo stone drawn by the viewer's own renderer, so it cannot
