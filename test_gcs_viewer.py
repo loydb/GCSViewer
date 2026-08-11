@@ -633,13 +633,12 @@ def test_load_design_dispatch(tmp):
 
 def test_tier_table():
     rows = gv.tier_table(synthetic_stone(), gear=96)
-    # the fixture's girdle is named "g1", so its row carries the derived
-    # name with the file's own kept in brackets
-    by = {r["name"].split(" ")[0]: r for r in rows}
+    # names are derived, so the fixture's "g1" tier is shown as G1
+    by = {r["name"]: r for r in rows}
 
     check("tiers: one row per tier", len(rows) == 4, [r["name"] for r in rows])
     check("tiers: cutting order preserved",
-          [r["name"] for r in rows] == ["P1", "G1 (g1)", "C1", "T"],
+          [r["name"] for r in rows] == ["P1", "G1", "C1", "T"],
           [r["name"] for r in rows])
     check("tiers: pavilion angle from the normal",
           near(by["P1"]["angle"], 43.0, 1e-6), by["P1"]["angle"])
@@ -695,13 +694,12 @@ def test_tier_labels():
           ["P1", "G1", "C1", "T"],
           [named[gv.tier_key(f)] for f in lettered][::8][:4])
     rows = gv.tier_table(lettered, gear=96)
-    check("labels: the table keeps the file's own name in brackets",
-          [r["name"] for r in rows] == ["P1 (a)", "G1 (b)", "C1 (c)", "T (d)"],
+    check("labels: the table shows the derived name and nothing else",
+          [r["name"] for r in rows] == ["P1", "G1", "C1", "T"],
           [r["name"] for r in rows])
-    check("labels: and drops the brackets when they agree",
-          [r["name"] for r in gv.tier_table(
-              [dict(f, tier=named[gv.tier_key(f)]) for f in lettered],
-              gear=96)] == ["P1", "G1", "C1", "T"])
+    check("labels: the file's own tier names are never displayed",
+          not any(any(c in r["name"] for c in "abcd()")
+                  for r in rows), [r["name"] for r in rows])
 
     # numbering runs per part of the stone, so a second pavilion tier is P2
     # even with a girdle and a crown tier cut between them

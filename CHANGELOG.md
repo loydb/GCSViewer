@@ -15,12 +15,11 @@ executable whose frozen code does not match the committed source.
   "the third one" and says even less to a reader whose alphabet is not this
   one. `P`, `G` and `C` name the part of the stone, so a design reads the same
   whatever wrote it.
-- Where a file's own tier name differs, the cutting table keeps it in
-  brackets — `P1 (a)`, `G2 (g1)`, `C5 (FR)` — so a design can still be
-  cross-referenced against the program that wrote it, and a frosting tier is
-  still recognisable as one. The stone itself is captioned with the derived
-  name only. Nothing on disk changes: the file's names come back out of
-  `write_gcs` exactly as they went in.
+- The tier names stored in a file are not shown anywhere — the derived name
+  replaces them on the stone and in the table. They are not altered either:
+  the parsers still return them and they come back out of `write_gcs` exactly
+  as they went in, verified by round-tripping a `.gem` whose tiers are
+  lettered.
 - `tier_groups()` now does the grouping and the geometry once, and the labels,
   the section headings and the table rows all read it, so they cannot disagree
   about where one tier ends or what part of the stone it is on.

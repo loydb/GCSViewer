@@ -63,11 +63,13 @@ the file (96 by default): a normal at 22.5° on a 96 gear is index 06.
 `G1`, `G2`, … on the girdle, `C1`, `C2`, … on the crown, `T` for the table —
 numbered in the order they are cut. Files rarely agree on this: GemCad writes a
 running lower-case alphabet (`a`, `b`, `c`, …), which says nothing beyond "the
-third one" and says even less if that alphabet is not the one you read. `P`,
-`G` and `C` name the part of the stone, and the number is the cutting order, so
-the table reads the same whatever wrote the file. Where a file's own name
-differs it is kept in brackets — `P1 (a)` — so a design can still be
-cross-referenced against the program that wrote it.
+third one" and says even less if that alphabet is not the one you read; others
+number tiers `1`, `2`, `3` with no sign of which end of the stone they are on.
+`P`, `G` and `C` name the part of the stone, and the number is the cutting
+order, so a design reads the same whatever wrote it.
+
+The tier names stored in a file are not shown. They are never modified either —
+what the viewer opens, it never writes to.
 
 A panel with nothing facing it says so, which is not always a fault — a preform
 has no crown yet, so there is genuinely nothing to draw from above.

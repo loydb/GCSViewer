@@ -944,11 +944,14 @@ def tier_labels(facets):
     numbered in cutting order.
 
     Derived from the geometry rather than read from the file, like the angle
-    and the index list beside it.  What a file calls its tiers is not a
-    shared language: GemCad writes a running lower-case alphabet (a, b, c,
-    …), which carries no meaning at all beyond "the third one", and reads as
-    nothing to anyone whose alphabet is not this one.  P, G and C name the
-    part of the stone; the number is the order it is cut in."""
+    and the index list beside it, and shown INSTEAD of the tier names the
+    file stores - those are never displayed.  What a file calls its tiers is
+    not a shared language: GemCad writes a running lower-case alphabet (a,
+    b, c, …), which carries no meaning at all beyond "the third one" and
+    reads as nothing to anyone whose alphabet is not this one; others number
+    tiers 1, 2, 3 with no sign of which end of the stone they are on.  P, G
+    and C name the part of the stone; the number is the order it is cut in;
+    T is the table."""
     counts = {"P": 0, "G": 0, "C": 0}
     labels = {}
     for key, _, _, kind in tier_groups(facets):
@@ -969,10 +972,9 @@ def tier_table(facets, gear=96.0):
 
     Name, angle, section and indices are all derived from geometry, so they
     appear for every file and read the same way whatever the file called its
-    tiers; the instruction text is whatever the file stored per tier.  Where
-    the file's own name differs from the derived one it is kept in brackets,
-    so a design can still be cross-referenced against the program that wrote
-    it."""
+    tiers; the instruction text is whatever the file stored per tier.  The
+    tier names stored in the file are not shown at all - see tier_labels()
+    for why they are not worth reading."""
     try:
         gear = float(gear) or 96.0
     except (TypeError, ValueError):
@@ -1010,9 +1012,6 @@ def tier_table(facets, gear=96.0):
             if s and s not in instrs:
                 instrs.append(s)
         name = labels.get(key, "")
-        original = str(grp[0].get("tier", "") or "").strip()
-        if original and original != name:
-            name = "%s (%s)" % (name, original)
         rows.append({"name": name, "angle": angle,
                      "section": section, "index": idx_str,
                      "instr": " · ".join(instrs)})
@@ -1048,8 +1047,8 @@ def render_instructions(rows, width=1412, gray=False):
     font = _load_font(fs)
 
     x_name = margin + 4
-    x_ang = x_name + int(0.075 * W)     # room for "P1 (P2(G))" - a derived
-    x_idx = x_ang + int(0.06 * W)       # name plus the file's own in brackets
+    x_ang = x_name + int(0.05 * W)
+    x_idx = x_ang + int(0.06 * W)
     x_com = x_idx + int(0.42 * W)
     name_maxw = x_ang - x_name - 10
     idx_maxw = x_com - x_idx - 12
