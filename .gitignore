@@ -25,6 +25,9 @@ local/
 !docs/demo.png
 !docs/icon-preview.png
 *_views.png
+# stills rendered for looking at, not for shipping - they appeared in the
+# working tree on 2026-08-11 and were nearly committed by a blanket add
+render-examples/
 
 # packaged distribution
 *.zip
