@@ -7,6 +7,24 @@ executable whose frozen code does not match the committed source.
 
 ## 1.0.34
 
+- **Tiers are named the way faceters name them**, derived from the geometry
+  like the angle and the index list beside them: `P1`, `P2`, … on the pavilion,
+  `G1`, `G2`, … on the girdle, `C1`, `C2`, … on the crown, `T` for the table,
+  numbered in cutting order. Files rarely agree on this — GemCad writes a
+  running lower-case alphabet (`a`, `b`, `c`, …), which says nothing beyond
+  "the third one" and says even less to a reader whose alphabet is not this
+  one. `P`, `G` and `C` name the part of the stone, so a design reads the same
+  whatever wrote it.
+- Where a file's own tier name differs, the cutting table keeps it in
+  brackets — `P1 (a)`, `G2 (g1)`, `C5 (FR)` — so a design can still be
+  cross-referenced against the program that wrote it, and a frosting tier is
+  still recognisable as one. The stone itself is captioned with the derived
+  name only. Nothing on disk changes: the file's names come back out of
+  `write_gcs` exactly as they went in.
+- `tier_groups()` now does the grouping and the geometry once, and the labels,
+  the section headings and the table rows all read it, so they cannot disagree
+  about where one tier ends or what part of the stone it is on.
+
 - **Colour-code tiers**, from a checkbox above the cutting instructions or the
   **C** key, **on when the window opens**. Every facet is painted by the tier
   it belongs to instead of by the material — each tier its own pastel, named

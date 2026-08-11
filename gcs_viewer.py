@@ -647,14 +647,17 @@ def _load_font(px):
 # ----------------------------------------------------------------------------
 
 def render_view(facets, basis, scale, color, size=620, ss=2,
-                gray=False, labels=True, light=None, palette=None):
+                gray=False, labels=True, light=None, palette=None,
+                names=None):
     """Render one orthographic, flat-shaded panel as an RGB PIL image.
     light: optional unit vector overriding the global LIGHT -- pass an
     angled headlight (cam_dir tilted) so bottom/side views read as well
     as the top (Loyd validation feedback 2026-07-14).
     palette: optional {tier_key: (r,g,b)} from tier_palette(), which
     colours each facet by its tier instead of by the material and takes
-    precedence over both `color` and `gray`."""
+    precedence over both `color` and `gray`.
+    names: optional {tier_key: label} from tier_labels(); without it a
+    facet is captioned with whatever the file called its tier."""
     right, up, forward, cam_dir = basis
     base_col = np.array((0.82, 0.82, 0.82) if gray else color, dtype=float)
 
@@ -682,6 +685,10 @@ def render_view(facets, basis, scale, color, size=620, ss=2,
         sy = verts @ up
         depth = float(np.mean(verts @ forward))
 
+        tier = f["tier"]
+        if names is not None:
+            tier = names.get(tier_key(f), tier)
+
         col = base_col
         tinted = False
         if palette is not None:
@@ -705,7 +712,7 @@ def render_view(facets, basis, scale, color, size=620, ss=2,
             spec = SPEC_K * (max(0.0, float(np.dot(n, halfway))) ** SHININESS)
             rgb = col * (AMBIENT + DIFFUSE * lam) + spec
         rgb = tuple(int(np.clip(c * 255, 0, 255)) for c in rgb)
-        drawables.append((depth, sx, sy, rgb, f["tier"], frosted, col))
+        drawables.append((depth, sx, sy, rgb, tier, frosted, col))
 
     if not drawables:
         # Not necessarily a fault.  A preform is cut girdle-first and has no
@@ -868,7 +875,7 @@ def _fit_text(font, text, maxw, keep=8):
 
 
 def make_panels(facets, scale, color, angles34, size, ss, gray, labels,
-                palette=None):
+                palette=None, names=None):
     # az=180 below: GCS presents its pavilion view flipped about the
     # VERTICAL axis (index 0 stays at the top, indices run CCW), so
     # match it rather than the 0-at-bottom horizontal-axis flip
@@ -877,7 +884,8 @@ def make_panels(facets, scale, color, angles34, size, ss, gray, labels,
              (view_basis(0, 0), None),
              (view_basis(*angles34), None)]
     return [render_view(facets, b, scale, color, size=size, ss=ss,
-                        gray=gray, labels=labels, light=lt, palette=palette)
+                        gray=gray, labels=labels, light=lt, palette=palette,
+                        names=names)
             for b, lt in specs]
 
 
@@ -894,18 +902,21 @@ _SECTION_STYLE = {
 }
 
 
-def tier_table(facets, gear=96.0):
-    """Group facets into tiers and derive the cutting-sequence rows:
-    name, faceting angle, section (Pavilion/Crown), index list, instruction.
+# A tier sitting this close to the girdle plane is a girdle tier, and this
+# close to the table plane is the table or the culet.  Loose enough for the
+# rounding in a stored normal (a design writing 89.99999 for a 90 tier is
+# ordinary), tight enough that no real break facet is caught by it.
+FLAT_TOL = 0.5          # degrees
 
-    Angle, section and indices are derived from geometry (so they appear for
-    every file); the instruction text is whatever the file stored per tier."""
-    try:
-        gear = float(gear) or 96.0
-    except (TypeError, ValueError):
-        gear = 96.0
-    gi = int(round(gear))
 
+def tier_groups(facets):
+    """Facets grouped into consecutive tiers, with what the geometry says
+    each tier is: (key, facets, angle, kind) where kind is one of
+    "table", "crown", "girdle", "pavilion".
+
+    Everything that describes a tier comes through here, so a label, a
+    section heading and a row can never disagree about where one tier ends
+    or what part of the stone it belongs to."""
     groups = []
     for f in facets:
         key = tier_key(f)
@@ -913,10 +924,66 @@ def tier_table(facets, gear=96.0):
             groups.append((key, []))
         groups[-1][1].append(f)
 
-    rows = []
-    for _, grp in groups:
+    out = []
+    for key, grp in groups:
         nz = float(max(-1.0, min(1.0, grp[0]["normal"][2])))
         angle = math.degrees(math.acos(min(1.0, abs(nz))))
+        if abs(angle - 90.0) <= FLAT_TOL:
+            kind = "girdle"
+        elif angle <= FLAT_TOL:
+            kind = "table" if nz > 0 else "pavilion"   # flat bottom = culet
+        else:
+            kind = "crown" if nz > 1e-3 else "pavilion"
+        out.append((key, grp, angle, kind))
+    return out
+
+
+def tier_labels(facets):
+    """{tier_key: label} in the faceter's convention - P1, P2… on the
+    pavilion, G1, G2… on the girdle, C1, C2… on the crown, T for the table -
+    numbered in cutting order.
+
+    Derived from the geometry rather than read from the file, like the angle
+    and the index list beside it.  What a file calls its tiers is not a
+    shared language: GemCad writes a running lower-case alphabet (a, b, c,
+    …), which carries no meaning at all beyond "the third one", and reads as
+    nothing to anyone whose alphabet is not this one.  P, G and C name the
+    part of the stone; the number is the order it is cut in."""
+    counts = {"P": 0, "G": 0, "C": 0}
+    labels = {}
+    for key, _, _, kind in tier_groups(facets):
+        if key in labels:
+            continue                    # one tier, cut in two passes
+        if kind == "table" and "T" not in labels.values():
+            labels[key] = "T"
+            continue
+        letter = {"girdle": "G", "pavilion": "P"}.get(kind, "C")
+        counts[letter] += 1
+        labels[key] = "%s%d" % (letter, counts[letter])
+    return labels
+
+
+def tier_table(facets, gear=96.0):
+    """Group facets into tiers and derive the cutting-sequence rows:
+    name, faceting angle, section (Pavilion/Crown), index list, instruction.
+
+    Name, angle, section and indices are all derived from geometry, so they
+    appear for every file and read the same way whatever the file called its
+    tiers; the instruction text is whatever the file stored per tier.  Where
+    the file's own name differs from the derived one it is kept in brackets,
+    so a design can still be cross-referenced against the program that wrote
+    it."""
+    try:
+        gear = float(gear) or 96.0
+    except (TypeError, ValueError):
+        gear = 96.0
+    gi = int(round(gear))
+
+    labels = tier_labels(facets)
+
+    rows = []
+    for key, grp, angle, kind in tier_groups(facets):
+        nz = float(max(-1.0, min(1.0, grp[0]["normal"][2])))
         section = "Pavilion" if nz < 1e-3 else "Crown"   # girdle->Pav, table->Crown
         idxs = []
         for f in grp:
@@ -942,7 +1009,11 @@ def tier_table(facets, gear=96.0):
             s = (f.get("instr", "") or "").strip()
             if s and s not in instrs:
                 instrs.append(s)
-        rows.append({"name": str(grp[0].get("tier", "") or ""), "angle": angle,
+        name = labels.get(key, "")
+        original = str(grp[0].get("tier", "") or "").strip()
+        if original and original != name:
+            name = "%s (%s)" % (name, original)
+        rows.append({"name": name, "angle": angle,
                      "section": section, "index": idx_str,
                      "instr": " · ".join(instrs)})
     return rows
@@ -977,9 +1048,10 @@ def render_instructions(rows, width=1412, gray=False):
     font = _load_font(fs)
 
     x_name = margin + 4
-    x_ang = x_name + int(0.05 * W)
-    x_idx = x_ang + int(0.06 * W)
+    x_ang = x_name + int(0.075 * W)     # room for "P1 (P2(G))" - a derived
+    x_idx = x_ang + int(0.06 * W)       # name plus the file's own in brackets
     x_com = x_idx + int(0.42 * W)
+    name_maxw = x_ang - x_name - 10
     idx_maxw = x_com - x_idx - 12
     com_maxw = W - x_com - 8
 
@@ -1013,8 +1085,8 @@ def render_instructions(rows, width=1412, gray=False):
             if i % 2:
                 d.rectangle([0, y, W, y + row_h], fill=(31, 31, 36))
             cy = y + row_h * 0.5
-            d.text((x_name, cy), r["name"][:8], fill=(226, 226, 230),
-                   font=font, anchor="lm")
+            d.text((x_name, cy), _fit_text(font, r["name"], name_maxw),
+                   fill=(226, 226, 230), font=font, anchor="lm")
             d.text((x_ang, cy), "%.2f°" % r["angle"], fill=(202, 202, 150),
                    font=font, anchor="lm")
             d.text((x_idx, cy), fit_idx(r["index"]), fill=(176, 200, 222),
@@ -1268,6 +1340,7 @@ class ViewerApp:
         # per design: stepping to the next stone must recolour, or tier 3 of
         # this design would wear the colour of tier 3 of the last one
         self.palette = tier_palette(facets)
+        self.names = tier_labels(facets)
 
     _natural_key = staticmethod(natural_key)
 
@@ -1310,19 +1383,22 @@ class ViewerApp:
         pal = self._palette()
         self.p_top = render_view(self.facets, view_basis(0, 90), self.scale,
                                  self.color, self.panel, self.ss_static,
-                                 self.gray, self.labels, palette=pal)
+                                 self.gray, self.labels, palette=pal,
+                                 names=self.names)
         self.p_pav = render_view(self.facets, view_basis(180, -90), self.scale,
                                  self.color, self.panel, self.ss_static,
                                  self.gray, self.labels, light=LIGHT_BELOW,
-                                 palette=pal)
+                                 palette=pal, names=self.names)
         self.p_side = render_view(self.facets, view_basis(0, 0), self.scale,
                                   self.color, self.panel, self.ss_static,
-                                  self.gray, self.labels, palette=pal)
+                                  self.gray, self.labels, palette=pal,
+                                  names=self.names)
 
     def _render_dynamic(self, ss):
         self.p_34 = render_view(self.facets, view_basis(self.az, self.el),
                                 self.scale, self.color, self.panel, ss,
-                                self.gray, self.labels, palette=self._palette())
+                                self.gray, self.labels, palette=self._palette(),
+                                names=self.names)
 
     def _composite_and_show(self):
         instr_img = None
@@ -1418,7 +1494,7 @@ class ViewerApp:
         panels = make_panels(self.facets, self.scale, self.color,
                              (self.az, self.el), size=680, ss=3,
                              gray=self.gray, labels=self.labels,
-                             palette=self._palette())
+                             palette=self._palette(), names=self.names)
         instr_img = None
         if self.show_instr:
             rows = tier_table(self.facets, gear=self.info.get("gear", 96.0))
@@ -1610,7 +1686,8 @@ def _selftest(report_path=None):
 
         scale = world_scale(back)
         panels = make_panels(back, scale, material["color"], (35, 28),
-                             size=240, ss=1, gray=False, labels=True)
+                             size=240, ss=1, gray=False, labels=True,
+                             names=tier_labels(back))
         instr = render_instructions(rows, width=instr_width(240))
         png = os.path.join(tmp, "selftest.png")
         compose(panels, info, gcs, 240, instr_img=instr).save(png)
@@ -1695,7 +1772,7 @@ def main(argv):
         panels = make_panels(facets, scale, material["color"], (35, 28),
                              size=680, ss=3, gray=gray, labels=labels,
                              palette=tier_palette(facets) if save_tint
-                             else None)
+                             else None, names=tier_labels(facets))
         rows = tier_table(facets, gear=info.get("gear", 96.0))
         instr_img = render_instructions(rows, width=instr_width(680), gray=gray)
         try:

@@ -82,7 +82,7 @@
       <vertex x="0.0" y="0.0" z="-0.9145970702377691" />
     </facet>
   </tier>
-  <tier angle="90.0" depth="0.9807852804032304" name="g1" instructions="Cut to equal depth, level the girdle" visible="true" guide="false">
+  <tier angle="90.0" depth="0.9807852804032304" name="G1" instructions="Cut to equal depth, level the girdle" visible="true" guide="false">
     <facet nx="-0.0" ny="1.0" nz="-0.0" index_angle="0">
       <vertex x="-0.19509032201612825" y="0.9807852804032304" z="0.0" />
       <vertex x="0.19509032201612825" y="0.9807852804032304" z="0.0" />

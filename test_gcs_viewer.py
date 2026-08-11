@@ -633,18 +633,21 @@ def test_load_design_dispatch(tmp):
 
 def test_tier_table():
     rows = gv.tier_table(synthetic_stone(), gear=96)
-    by = {r["name"]: r for r in rows}
+    # the fixture's girdle is named "g1", so its row carries the derived
+    # name with the file's own kept in brackets
+    by = {r["name"].split(" ")[0]: r for r in rows}
 
     check("tiers: one row per tier", len(rows) == 4, [r["name"] for r in rows])
     check("tiers: cutting order preserved",
-          [r["name"] for r in rows] == ["P1", "g1", "C1", "T"])
+          [r["name"] for r in rows] == ["P1", "G1 (g1)", "C1", "T"],
+          [r["name"] for r in rows])
     check("tiers: pavilion angle from the normal",
           near(by["P1"]["angle"], 43.0, 1e-6), by["P1"]["angle"])
     check("tiers: girdle reads 90 degrees",
-          near(by["g1"]["angle"], 90.0, 1e-6), by["g1"]["angle"])
+          near(by["G1"]["angle"], 90.0, 1e-6), by["G1"]["angle"])
     check("tiers: table reads 0 degrees", near(by["T"]["angle"], 0.0, 1e-9))
     check("tiers: girdle sections as Pavilion",
-          by["g1"]["section"] == "Pavilion")
+          by["G1"]["section"] == "Pavilion")
     check("tiers: crown sections as Crown", by["C1"]["section"] == "Crown")
     check("tiers: table sections as Crown", by["T"]["section"] == "Crown")
     check("tiers: table has no index list", by["T"]["index"] == "Table",
@@ -660,6 +663,83 @@ def test_tier_table():
     r0 = gv.tier_table(synthetic_stone(), gear=0)
     check("tiers: a zero gear falls back to 96 instead of dividing by it",
           {r["name"]: r for r in r0}["P1"]["index"] == "00-12-24-36-48-60-72-84")
+
+
+def test_tier_labels():
+    """Tier names are derived, like the angle and the index list beside
+    them: P on the pavilion, G on the girdle, C on the crown, T for the
+    table, numbered in cutting order.  What a file calls its tiers is not a
+    shared language - GemCad writes a running lower-case alphabet, which
+    means nothing beyond "the third one" and reads as nothing at all to
+    someone whose alphabet is not this one."""
+    facets = synthetic_stone()
+    labels = gv.tier_labels(facets)
+    kinds = {gv.tier_key(f): None for f in facets}
+    check("labels: one per tier", len(labels) == len(kinds),
+          (len(labels), len(kinds)))
+    check("labels: the convention, in cutting order",
+          [labels[k] for k in kinds] == ["P1", "G1", "C1", "T"],
+          [labels[k] for k in kinds])
+
+    # the case this exists for: a design whose tiers are a, b, c, d
+    lettered = [dict(f) for f in facets]
+    seen, letters = {}, iter("abcdefghij")
+    for f in lettered:
+        k = gv.tier_key(f)
+        if k not in seen:
+            seen[k] = next(letters)
+        f["tier"] = seen[k]
+    named = gv.tier_labels(lettered)
+    check("labels: an alphabet of tier names still reads P/G/C/T",
+          [named[gv.tier_key(f)] for f in lettered][::8][:4] ==
+          ["P1", "G1", "C1", "T"],
+          [named[gv.tier_key(f)] for f in lettered][::8][:4])
+    rows = gv.tier_table(lettered, gear=96)
+    check("labels: the table keeps the file's own name in brackets",
+          [r["name"] for r in rows] == ["P1 (a)", "G1 (b)", "C1 (c)", "T (d)"],
+          [r["name"] for r in rows])
+    check("labels: and drops the brackets when they agree",
+          [r["name"] for r in gv.tier_table(
+              [dict(f, tier=named[gv.tier_key(f)]) for f in lettered],
+              gear=96)] == ["P1", "G1", "C1", "T"])
+
+    # numbering runs per part of the stone, so a second pavilion tier is P2
+    # even with a girdle and a crown tier cut between them
+    many = (cone_facets(8, 43.0, tier="x") + girdle_facets()
+            + cone_facets(8, 41.0, r=1.0, z0=0.12, down=False, tier="y")
+            + cone_facets(8, 39.0, tier="z"))
+    for i, f in enumerate(many):        # give every run its own tier id
+        f["tid"] = i // 8
+    seq = gv.tier_labels(many)
+    check("labels: numbering runs per part of the stone",
+          [seq[k] for k in dict.fromkeys(gv.tier_key(f) for f in many)] ==
+          ["P1", "G1", "C1", "P2"],
+          [seq[k] for k in dict.fromkeys(gv.tier_key(f) for f in many)])
+
+    # a facet within half a degree of the girdle plane is a girdle tier;
+    # a stored 89.99999 is ordinary and must not read as a pavilion tier
+    almost = girdle_facets()
+    for f in almost:
+        n = f["normal"]
+        f["normal"] = n / _np_norm(n)
+    check("labels: a girdle a hair off 90 is still a girdle",
+          list(gv.tier_labels(almost).values()) == ["G1"],
+          gv.tier_labels(almost))
+
+    # the stone is captioned with the derived names, not the file's
+    scale = gv.world_scale(lettered)
+    with_names = gv.render_view(lettered, gv.view_basis(0, 90), scale,
+                                (0.2, 0.55, 0.9), size=200, ss=1,
+                                names=gv.tier_labels(lettered))
+    without = gv.render_view(lettered, gv.view_basis(0, 90), scale,
+                             (0.2, 0.55, 0.9), size=200, ss=1)
+    check("labels: the renders caption facets with them",
+          list(with_names.getdata()) != list(without.getdata()))
+
+
+def _np_norm(v):
+    import numpy as _np
+    return _np.linalg.norm(v)
 
 
 def test_tier_table_multi_instruction():
@@ -1516,6 +1596,7 @@ def main():
         test_parse_gem_adversarial_tail(tmp)
         test_load_design_dispatch(tmp)
         test_tier_table()
+        test_tier_labels()
         test_tier_table_multi_instruction()
         test_view_basis()
         test_render()

@@ -51,7 +51,7 @@ drift from what the program produces.
 ## Tests
 
 ```bash
-python test_gcs_viewer.py     # 222 checks
+python test_gcs_viewer.py     # 230 checks
 python test_gui.py            # 51 checks, the window itself
 ```
 
@@ -68,9 +68,9 @@ dispatch. It skips where Tk has no display, so headless runners stay green.
 python scripts/mutation_check.py
 ```
 
-Reintroduces twenty-six deliberate defects one at a time — dropping the `.gem`
+Reintroduces twenty-seven deliberate defects one at a time — dropping the `.gem`
 Y mirror, painting nearest-first, ignoring the gear — and reports which checks
-catch each. Currently **26 of 26**. Its first run found three that survived,
+catch each. Currently **27 of 27**. Its first run found three that survived,
 which is why the suite now builds deliberately non-convex scenes: a convex
 stone hides its own back faces *and* tiles its silhouette, so the cull and the
 depth sort can both break without changing a pixel.

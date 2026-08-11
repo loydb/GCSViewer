@@ -54,10 +54,20 @@ in the file:
 Below them the **cutting sequence** — tier, angle, index list and the
 instruction the file carries — grouped into Pavilion and Crown.
 
-Angle, section and index list are derived from the geometry rather than read
-from the file, so they appear even for designs that store no instructions.
-Index positions come from each facet normal against the gear in the file (96 by
-default): a normal at 22.5° on a 96 gear is index 06.
+Name, angle, section and index list are all derived from the geometry rather
+than read from the file, so they appear even for designs that store no
+instructions. Index positions come from each facet normal against the gear in
+the file (96 by default): a normal at 22.5° on a 96 gear is index 06.
+
+**Tiers are named the way faceters name them** — `P1`, `P2`, … on the pavilion,
+`G1`, `G2`, … on the girdle, `C1`, `C2`, … on the crown, `T` for the table —
+numbered in the order they are cut. Files rarely agree on this: GemCad writes a
+running lower-case alphabet (`a`, `b`, `c`, …), which says nothing beyond "the
+third one" and says even less if that alphabet is not the one you read. `P`,
+`G` and `C` name the part of the stone, and the number is the cutting order, so
+the table reads the same whatever wrote the file. Where a file's own name
+differs it is kept in brackets — `P1 (a)` — so a design can still be
+cross-referenced against the program that wrote it.
 
 A panel with nothing facing it says so, which is not always a fault — a preform
 has no crown yet, so there is genuinely nothing to draw from above.

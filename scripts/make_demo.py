@@ -66,7 +66,7 @@ def build():
     for i in range(N):                                    # girdle
         out.append(facet([ring(i - 0.5, R, 0.0), ring(i + 0.5, R, 0.0),
                           ring(i + 0.5, R, GIRDLE), ring(i - 0.5, R, GIRDLE)],
-                         "g1", "Cut to equal depth, level the girdle", 1,
+                         "G1", "Cut to equal depth, level the girdle", 1,
                          centre))
     for i in range(N):                                    # crown mains
         out.append(facet([ring(i - 0.5, R, GIRDLE), ring(i + 0.5, R, GIRDLE),
