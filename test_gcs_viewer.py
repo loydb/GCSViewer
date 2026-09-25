@@ -627,64 +627,58 @@ def test_write_gcs_splits_cutting_steps(tmp):
 
 
 def test_step_key_on_a_boundary(tmp):
-    """Two facets of ONE cut must key alike even when the cut sits exactly on
-    the rounding grid, where the answer is decided by the last bits of a
-    float - and those bits are not stable.  parse_gcs normalises the normal
-    it reads, so a file written and read back carries normals an ulp from the
-    ones that went in.
+    """Two facets of ONE cut must key alike even when the cut lands on the
+    rounding grid, where the answer is decided by the last bits of a float -
+    and those bits are not stable.  parse_gcs normalises the normal it
+    reads, so a file written and read back carries normals an ulp from the
+    ones that went in, and the plane measured off them moves with it.
 
     Measured before this was guarded: 6 tiers in 2 of 1,593 designs split in
     two on a boundary - one cut written as two tiers, two identical rows in
     the cutting table - and 2 designs in 12,632 came back from a round trip
-    with a tier more than they went in with."""
+    with a tier more than they went in with.
+
+    The pair below straddles in DEPTH, not in angle, and that is deliberate.
+    An earlier version used two normals an ulp apart and relied on acos
+    landing either side of the fence; it does under the Windows CRT and does
+    not under glibc, which rounds acos the other way, so the premise held on
+    one platform and not the other.  Here both facets carry the SAME nz, so
+    acos is handed the same double everywhere and the angle cannot differ;
+    the single vertex sits on the x axis against a normal with ny = 0, so
+    v . n is one product and two exact zeros - no summation order, no FMA.
+    Verified under both libms."""
     import xml.etree.ElementTree as ET
 
-    # One real facet, twice: the normal as it is read from
-    # 04.011A FVS-115.gcs and the normal that same facet has after the file
-    # has been through write_gcs and been read again.  They differ by one
-    # ulp in each component - parse_gcs normalises what it reads, and
-    # normalising a vector that is already 1 - 2**-53 long moves it - and
-    # the faceting angle lands on 138.13865, exactly between two points of
-    # the 4-decimal grid.  Written as hex floats so that no decimal literal
-    # can quietly round one of them on the way in.
-    def fs(*hx):
-        return np.array([float.fromhex(h) for h in hx])
+    nz = -0.75
+    nx = math.sqrt(1.0 - nz * nz)          # ny = 0, so this is already unit
+    x = float.fromhex("0x1.3d0f40a5e2e9cp-15")   # puts x*nx on the fence
 
-    verts = np.array([
-        fs('0x1.333882f0a9e3ap-1', '-0x1.99988255fcfd2p-1', '0x1.09e03749e2383p-2'),
-        fs('0x1.32aae259db7b8p-1', '-0x1.988a593fefccbp-1', '0x1.07bf3162b072dp-2'),
-        fs('0x1.0cb1765641658p-11', '0x1.5b676b1aab296p-55', '-0x1.376458949739fp-1'),
-        fs('0x1.8c000006a4ceap-53', '0x1.5b8aabb4d7b51p-55', '-0x1.377b612781b20p-1'),
-        fs('0x1.2bfb195dc1c23p-52', '-0x1.c2f8d83ebcc11p-3', '-0x1.b44d03b3c972cp-2'),
-    ])
-    before = fs('0x1.05815a5bc37efp-2', '-0x1.3baa30850d2f6p-1',
-                '-0x1.7d516dbdb1d3ap-1')
-    after = fs('0x1.05815a5bc37f0p-2', '-0x1.3baa30850d2f7p-1',
-               '-0x1.7d516dbdb1d3bp-1')
+    def one(n_x):
+        return {"verts": np.array([[x, 0.0, 0.0]]),
+                "normal": np.array([n_x, 0.0, nz]),
+                "tier": "P1", "instr": "Cut", "tid": 0}
 
-    def ring(normal):
-        return [{"verts": verts, "normal": normal, "tier": "P1",
-                 "instr": "Cut", "tid": 0} for _ in range(4)]
+    a, b = one(nx), one(math.nextafter(nx, 2.0))
+    pa, pb = gv.facet_plane(a), gv.facet_plane(b)
 
-    a, b = ring(before), ring(after)
-    # the premise: the ulp really does move the raw angle, and it really
-    # does sit on the fence, so rounding alone would answer differently
-    raw_a, raw_b = gv.facet_plane(a[0])[0], gv.facet_plane(b[0])[0]
-    check("boundary: the ulp moves the raw angle", raw_a != raw_b,
-          (repr(raw_a), repr(raw_b)))
-    check("boundary: and rounding alone would split them",
-          round(raw_a, 4) != round(raw_b, 4),
-          (round(raw_a, 4), round(raw_b, 4)))
-    check("boundary: an ulp in the normal does not change the step",
-          gv.step_key(a[0]) == gv.step_key(b[0]),
-          (gv.step_key(a[0]), gv.step_key(b[0])))
+    check("boundary: the two facets are at the same angle",
+          pa[0] == pb[0], (repr(pa[0]), repr(pb[0])))
+    check("boundary: their depths differ by an ulp",
+          pa[1] != pb[1] and abs(pa[1] - pb[1]) < 1e-19,
+          (repr(pa[1]), repr(pb[1])))
+    check("boundary: so rounding alone would put them in different tiers",
+          round(pa[1], gv.STEP_DEPTH_DP) != round(pb[1], gv.STEP_DEPTH_DP),
+          (round(pa[1], gv.STEP_DEPTH_DP), round(pb[1], gv.STEP_DEPTH_DP)))
+    check("boundary: snapping first does not",
+          gv.step_key(a) == gv.step_key(b), (gv.step_key(a), gv.step_key(b)))
 
-    mixed = a[:2] + b[2:]                   # half the ring nudged, one cut
-    check("boundary: one cut stays one tier either way",
-          len(gv.tier_groups(mixed)) == 1,
-          [g[0] for g in gv.tier_groups(mixed)])
+    # ...and the whole way through: one cut, one tier, one <tier> written
+    cut = [dict(a), dict(a), dict(b), dict(b)]
+    check("boundary: one cut stays one tier",
+          len(gv.tier_groups(cut)) == 1,
+          [g[0] for g in gv.tier_groups(cut)])
     q = os.path.join(tmp, "boundary.gcs")
-    gv.write_gcs(q, mixed, {"title": "Boundary"}, {"color": (.5, .5, .5)})
+    gv.write_gcs(q, cut, {"title": "Boundary"}, {"color": (.5, .5, .5)})
     check("boundary: and is written as one tier",
           len(list(ET.parse(q).iter("tier"))) == 1,
           len(list(ET.parse(q).iter("tier"))))
