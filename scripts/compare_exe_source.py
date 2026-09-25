@@ -4,9 +4,15 @@ current source file.
 
 The exe carries the entry script as a *marshalled code object*, not as text,
 so there is no source to diff.  What can be compared exactly is the code:
-every function's signature, docstring, constants and compiled bytecode.  This
-answers the only question that matters after an edit - "is the shipped exe
-still the source?" - without a decompiler.
+every function's signature, its whole docstring, its constants and the length
+of its compiled bytecode.  That answers the question that matters after an
+edit - "is the shipped exe still the source?" - without a decompiler.
+
+It is not a proof of equality: two different functions can compile to the
+same number of bytes with the same names and constants.  It is a check that
+goes off when something real has changed, and it is only as good as what it
+compares - it used to read the first line of a docstring and 60 characters
+of a constant, and passed an exe whose docstring had since been reworded.
 
     python scripts/compare_exe_source.py GCSViewer.exe gcs_viewer.py
 
@@ -55,9 +61,15 @@ def describe(code):
         "args": code.co_argcount,
         "kwonly": code.co_kwonlyargcount,
         "names": tuple(code.co_varnames[:code.co_argcount]),
-        "doc": (doc or "").strip().splitlines()[:1],
+        # The WHOLE docstring and the WHOLE constant.  Comparing the
+        # first line and a 60-character prefix let a reworded docstring
+        # through as IDENTICAL on 2026-09-25 - and would let through a
+        # changed long string too, a message or a URL that still starts the
+        # same way.  The frozen code carries the full text, so compare it;
+        # truncation belongs in what is printed, not in what is compared.
+        "doc": (doc or "").strip(),
         "bytes": len(code.co_code),
-        "consts": tuple(repr(c)[:60] for c in code.co_consts
+        "consts": tuple(repr(c) for c in code.co_consts
                         if not isinstance(c, types.CodeType)),
         "globals": tuple(sorted(set(code.co_names))),
     }
@@ -90,7 +102,8 @@ def main(argv):
         print("ADDED in source (not in the exe):")
         for k in added:
             d = describe(new[k])
-            print(f"  + {k}({', '.join(d['names'])})   {d['doc'] and d['doc'][0] or ''}")
+            first = (d["doc"].splitlines() or [""])[0]
+            print("  + %s(%s)   %.60s" % (k, ", ".join(d["names"]), first))
         print()
     if removed:
         print("REMOVED (in the exe, gone from source):")
@@ -105,7 +118,14 @@ def main(argv):
                 print(f"      signature: ({', '.join(a['names'])}) -> "
                       f"({', '.join(b['names'])})")
             if a["doc"] != b["doc"]:
-                print(f"      docstring: {a['doc']} -> {b['doc']}")
+                # first lines only - the whole text is compared, but a
+                # multi-line docstring printed raw wrecks the report
+                fa = (a["doc"].splitlines() or [""])[0]
+                fb = (b["doc"].splitlines() or [""])[0]
+                if fa == fb:
+                    print("      docstring: reworded below the first line")
+                else:
+                    print("      docstring: %.60s -> %.60s" % (fa, fb))
             if a["globals"] != b["globals"]:
                 gone = sorted(set(a["globals"]) - set(b["globals"]))
                 fresh = sorted(set(b["globals"]) - set(a["globals"]))
@@ -117,9 +137,9 @@ def main(argv):
                 gone = [c for c in a["consts"] if c not in b["consts"]]
                 fresh = [c for c in b["consts"] if c not in a["consts"]]
                 for c in fresh:
-                    print(f"      + const {c}")
+                    print("      + const %.80s%s" % (c, "..." * (len(c) > 80)))
                 for c in gone:
-                    print(f"      - const {c}")
+                    print("      - const %.80s%s" % (c, "..." * (len(c) > 80)))
             if a["bytes"] != b["bytes"]:
                 print(f"      bytecode: {a['bytes']} -> {b['bytes']} bytes")
         print()
