@@ -41,13 +41,18 @@ executable whose frozen code does not match the committed source.
   grid. Without that, **6 tiers across 2 of 1,593 designs split in two on a
   boundary** (one cut written as two tiers, two identical rows in the table),
   and 2 designs in 12,632 came back from a round trip with a tier more than
-  they went in with. With it, none do.
+  they went in with. With it, none do. Those counts are from Windows: the
+  Windows CRT and glibc round `acos` differently in the last bit, so the
+  hazard is the same everywhere but *which* facets sit on a fence is not.
 - **`index_angle` is written from the facet's normal** — `atan2(-nx, -ny)` in
   degrees — instead of a flat `0` on every facet. It matches Gem Cut Studio's
-  own value exactly on all 11,651 facets of 150 of its own files, and retires
-  the patch the conversion pipelines carried to put it back. (Its *mirrored*
-  facets carry the index they were mirrored from, but only files declaring a
-  symmetry have those, and `write_gcs` never declares one.)
+  own value exactly on all 11,651 facets of 150 of its own files. (Its
+  *mirrored* facets carry the index they were mirrored from, but only files
+  declaring a symmetry have those, and `write_gcs` never declares one.) This
+  retires the index-angle half of the conversion pipelines'
+  `fix_index_angles()` — **not** its other half, which re-homes a facet whose
+  angle disagrees with its tier's; that one keys on angle alone, so it never
+  could see a facet differing from its tier only in depth.
 - `scripts/check_tier_steps.py` reports the tiers that hold more than one
   cutting step in any folder of designs, and with `--recut` counts the facets
   a re-cut from the tiers would leave standing.

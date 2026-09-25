@@ -479,8 +479,11 @@ def facet_index_angle(normal):
     gear at all, and GCS writes 0 for those.
 
     Writing this rather than a flat 0 is what lets a converted file be read
-    by anything that trusts the attribute; the conversion pipelines had a
-    patch of their own to put it back (fix_index_angles)."""
+    by anything that trusts the attribute.  The conversion pipelines had a
+    patch of their own to put it back - the first half of
+    09_convert_gem_to_gcs.fix_index_angles() - which this retires.  Its
+    SECOND half does something else entirely, re-homing a facet whose angle
+    disagrees with its tier's, and is not retired by any of this."""
     nx, ny = float(normal[0]), float(normal[1])
     if math.hypot(nx, ny) < 1e-12:
         return 0.0
