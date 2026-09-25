@@ -74,9 +74,27 @@ MUTATIONS = [
     ("skip the trailing strings in .gem (the 2026-07-13 title/notes work)",
      'info["title"] = trailing[0].strip()',
      'info["title"] = ""'),
-    ("write only the opening step of a tier, losing the rest on conversion",
-     "            if s and s not in steps:\n                steps.append(s)",
-     "            if s and not steps:\n                steps.append(s)"),
+    ("write only the opening instruction of a tier, losing the rest",
+     "                if text and text not in steps:\n"
+     "                    steps.append(text)",
+     "                if text and not steps:\n"
+     "                    steps.append(text)"),
+    ("write a tier holding two cutting steps as one tier again - the defect "
+     "that printed 27 of 57 facets on a Gem Cut Studio sheet",
+     "            if parts and parts[-1][0] == k:",
+     "            if parts:"),
+    ("let a label, a colour and a cutting-table row merge two cutting steps",
+     '    return (facet.get("tid"), facet.get("tier", "")) + step_key(facet)',
+     '    return (facet.get("tid"), facet.get("tier", ""))'),
+    ("let a float's last bits decide which tier a facet is in",
+     "    return (round(_snap(angle), STEP_ANGLE_DP),\n"
+     "            round(_snap(depth), STEP_DEPTH_DP))",
+     "    return (round(angle, STEP_ANGLE_DP),\n"
+     "            round(depth, STEP_DEPTH_DP))"),
+    ("write a flat index_angle of 0 on every facet again",
+     "                    index_angle=repr(facet_index_angle(n)))",
+     '                    index_angle="0")'),
+
     ("merge two same-named tiers into one on write",
      "        if len(by_tid) > len(by_name):\n            boundaries = by_tid",
      "        if False:\n            boundaries = by_tid"),

@@ -7,6 +7,50 @@ executable whose frozen code does not match the committed source.
 
 ## 1.0.34
 
+- **One tier per cutting step, on write and on screen.** A `.gcs` `<tier>`
+  carries one `angle=` and one `depth=` for all of its facets, so a tier
+  holding two cuts can only describe one of them. Gem Cut Studio draws the 3D
+  stone from the stored polygons, so such a file looks perfect on screen; its
+  **sheet** is re-cut from (angle, index, depth) per tier, and there the
+  second cut is dropped along with every later tier that met it. *Saw Tooth
+  Marquise* printed "Total facets 27" over a plan view whose lines do not
+  close, for 57 facets in the mesh. `write_gcs()` now ends a tier at a change
+  of cutting step as well as at a change of name or tier id, and lettering
+  tells the parts of a split tier apart — `P3`, `P3b`, `P3c`. Nothing about
+  the mesh moves: the same facets in the same order, with the same normals
+  and vertices — **18,003 designs written and read back, every one of them
+  bit-exact**. Measured across the files this had written: 3,726 of them held
+  16,108 such tiers, and of the 2,770 with a Gem Cut Studio sheet beside
+  them, 798 printed short.
+- The same boundary now governs the display, so a **file already on disk**
+  reads correctly without being rewritten: `tier_key()` splits on the cutting
+  step, and the labels, the colours, the captions and the cutting table all
+  follow it. A row can no longer claim a tier was cut at two angles at once.
+- It also sorts out the `.gem` cutting instructions, which used to be crammed
+  into one row joined by `·` because the steps they belonged to were crammed
+  into one tier. Across **1,700 `.gem` files, 1,036 held a tier carrying more
+  than one instruction** under the old boundary, 4,266 lines in all; under
+  this one, none do — each step is its own tier with its own line. The
+  joining stays for what it was always for: a `.gcs` repeats one instruction
+  on every facet of a tier, and that has to collapse to a single line.
+- A cutting step is recognised by its angle and depth on a four- and
+  five-decimal grid, and a grid has boundaries a float can sit on. Those last
+  bits are not stable — `parse_gcs` normalises the normal it reads, so a file
+  written and read again carries normals an ulp from the ones that went in —
+  so the value is snapped to twelve significant figures before it meets the
+  grid. Without that, **6 tiers across 2 of 1,593 designs split in two on a
+  boundary** (one cut written as two tiers, two identical rows in the table),
+  and 2 designs in 12,632 came back from a round trip with a tier more than
+  they went in with. With it, none do.
+- **`index_angle` is written from the facet's normal** — `atan2(-nx, -ny)` in
+  degrees — instead of a flat `0` on every facet. It matches Gem Cut Studio's
+  own value exactly on all 11,651 facets of 150 of its own files, and retires
+  the patch the conversion pipelines carried to put it back. (Its *mirrored*
+  facets carry the index they were mirrored from, but only files declaring a
+  symmetry have those, and `write_gcs` never declares one.)
+- `scripts/check_tier_steps.py` reports the tiers that hold more than one
+  cutting step in any folder of designs, and with `--recut` counts the facets
+  a re-cut from the tiers would leave standing.
 - **Tiers are named the way faceters name them**, derived from the geometry
   like the angle and the index list beside them: `P1`, `P2`, … on the pavilion,
   `G1`, `G2`, … on the girdle, `C1`, `C2`, … on the crown, `T` for the table,
@@ -47,10 +91,10 @@ executable whose frozen code does not match the committed source.
   design, so stepping through a folder never carries a colour across.
 - `tier_key()` now says what makes two facets the same tier, and both the
   cutting table and the palette use it — a colour and its row cannot disagree
-  about where one tier ends. It pairs the tier id with the name: some designs
-  name two tiers alike, and a caller building facets by hand may reuse an id.
-  Every real file already numbers its tiers uniquely, and 400 designs across
-  the reference collection group identically before and after.
+  about where one tier ends. It takes the tier id, the name and the cutting
+  step: some designs name two tiers alike, a caller building facets by hand
+  may reuse an id, and a stored tier is free to hold facets from more than
+  one cut.
 - The README animation is regenerated, and now ticks and unticks the checkbox
   as it turns the stone — the two things about the window that a still picture
   cannot say. It draws the control row into the seam `compose(split=True)`

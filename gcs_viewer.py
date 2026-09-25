@@ -411,6 +411,95 @@ def load_design(path):
     return parse_gcs(path)
 
 
+# How exactly two facets must agree before they count as one cutting step.
+# The facets of a step all come off one plane setting, so they agree to about
+# 1e-12.  These are the tolerances the corpus repair uses
+# (Facetdiagrams.org/Scripts/74_fix_mixed_depth_tiers.py, which found with
+# them 16,108 tiers to split across 3,726 files), and this has to keep
+# them, or the viewer would group a repaired file differently from the way
+# it was repaired.
+STEP_ANGLE_DP = 4
+STEP_DEPTH_DP = 5
+
+# ...and the significant digits the value is snapped to before it meets that
+# grid, which is what keeps a facet off the fence.
+#
+# A grid has boundaries, and a value that lands on one is decided by its last
+# bits.  Those bits are not stable: parse_gcs normalises the normal it reads,
+# so a file written and read back has normals one ulp from the ones that went
+# in, and the angle moves with them.  Measured over 1,593 designs, 6 tiers in
+# 2 of them split in two on a boundary - one cut, written as two tiers, two
+# identical rows in the table - and two designs in 12,632 came back from a
+# round trip with an extra tier.  Snapping to twelve significant figures is
+# far below anything a design distinguishes and far above the noise; with it,
+# none of them do.
+STEP_SIG_FIGS = 12
+
+# Letters for the parts a split tier is written as: P3, P3b, P3c.
+STEP_SUFFIX = "bcdefghijklmnopqrstuvwxyz"
+
+
+def facet_plane(facet):
+    """(angle, depth) for one facet - the pair a <tier> element stores.
+
+    angle is arccos(nz) in degrees, 0..180: the convention Gem Cut Studio
+    reads the section off, where 0 is the table, under 90 the crown, 90 the
+    girdle and over 90 the pavilion.  It is not the faceting angle the
+    cutting table prints, which folds the pavilion back into 0..90.
+
+    depth is n . v, the plane's signed distance from the origin, averaged
+    over the facet's vertices rather than read off the first so that one
+    vertex sitting a bit off the plane cannot move it.
+
+    The pair IS the cut: two facets came off the same setting of the machine
+    exactly when they share it."""
+    n = np.asarray(facet["normal"], float)
+    ln = float(np.linalg.norm(n))
+    if ln <= 1e-12:
+        return 0.0, 0.0
+    n = n / ln
+    angle = math.degrees(math.acos(max(-1.0, min(1.0, float(n[2])))))
+    verts = np.asarray(facet["verts"], float)
+    depth = float(np.mean(verts @ n)) if len(verts) else 0.0
+    return angle, depth
+
+
+def facet_index_angle(normal):
+    """Where a facet sits on the index gear, in degrees, 0..360.
+
+    Gem Cut Studio stores this beside the normal on every facet, and it is
+    the bearing of that normal measured the way the gear turns:
+    atan2(-nx, -ny).  Checked against 150 of its own files that declare no
+    symmetry: all 11,651 facets agree exactly.  Its MIRRORED facets do not -
+    they carry the index of the position they were mirrored from - but those
+    only occur in files that DO declare a symmetry, and this never writes
+    one: <index symmetry="0" mirror="0">.
+
+    A flat facet - a table or a culet, nx = ny = 0 - has no bearing on the
+    gear at all, and GCS writes 0 for those.
+
+    Writing this rather than a flat 0 is what lets a converted file be read
+    by anything that trusts the attribute; the conversion pipelines had a
+    patch of their own to put it back (fix_index_angles)."""
+    nx, ny = float(normal[0]), float(normal[1])
+    if math.hypot(nx, ny) < 1e-12:
+        return 0.0
+    return math.degrees(math.atan2(-nx, -ny)) % 360.0
+
+
+def _snap(x, figs=None):
+    """x with everything below `figs` significant digits thrown away."""
+    return float("%.*g" % (STEP_SIG_FIGS if figs is None else figs, x))
+
+
+def step_key(facet):
+    """The cutting step a facet belongs to, quantised so that two facets of
+    one cut cannot be told apart by float noise - see STEP_SIG_FIGS."""
+    angle, depth = facet_plane(facet)
+    return (round(_snap(angle), STEP_ANGLE_DP),
+            round(_snap(depth), STEP_DEPTH_DP))
+
+
 def write_gcs(path, facets, info, material, gear=96):
     """Serialize parsed facets to Gem Cut Studio .gcs XML."""
     import xml.etree.ElementTree as ET
@@ -426,16 +515,16 @@ def write_gcs(path, facets, info, material, gear=96):
     root = ET.Element("GemCutStudio", version="1000")
     ET.SubElement(root, "index", gear=gear_s, base="0", symmetry="0", mirror="0")
 
-    # Tiers are delimited by consecutive facets sharing a tier name.  That is
-    # wrong for the handful of designs that give two different <tier> elements
-    # the same name - four of the 8,128 files in the reference collection do,
-    # and one of them rewrote seven tiers as one.  Where the facets carry the
-    # tid parse_gcs assigns per element, that is the better key.
+    # A tier ends where its NAME ends - or, where the facets carry the tid
+    # parse_gcs assigns per <tier> element, where the tid does.  The name
+    # alone is wrong for the handful of designs that give two different
+    # <tier> elements the same name: four of the 8,128 files in the reference
+    # collection do, and one of them rewrote seven tiers as one.
     #
-    # It is only adopted when it produces MORE tiers than the names do, so
-    # this can split a tier that should never have been merged and can never
+    # The tid is only adopted when it produces MORE tiers than the names do,
+    # so it can split a tier that should never have been merged and can never
     # merge two that belong apart.  Callers that build facets without a tid -
-    # every solver script that writes through here does - are unaffected.
+    # every solver script that writes through here does - group by name.
     def runs(key):
         out, prev = [], object()
         for f in facets:
@@ -446,52 +535,85 @@ def write_gcs(path, facets, info, material, gear=96):
             out[-1] += 1
         return out
 
-    by_name = runs(lambda f: f.get("tier", "") or "")
+    def name_of(f):
+        return f.get("tier", "") or ""
+
+    by_name = runs(name_of)
     boundaries = by_name
     if all("tid" in f for f in facets):
-        by_tid = runs(lambda f: (f["tid"], f.get("tier", "") or ""))
+        by_tid = runs(lambda f: (f["tid"], name_of(f)))
         if len(by_tid) > len(by_name):
             boundaries = by_tid
 
     i = 0
     for run_len in boundaries:
-        tier = facets[i].get("tier", "") or ""
-        # Every distinct step in the tier, not just the one the tier opens
-        # with.  A .gem puts the instruction on the facet that *begins* a
-        # cutting step and a tier can hold several, so taking facets[i] alone
-        # dropped later steps on conversion - 322 of the 1,103 .gem files in
-        # the reference collection hold such a tier, 840 steps in all
-        # (re-measured 2026-08-11).  Repeats collapse, so a .gcs (one
-        # instruction repeated across its tier) is unchanged.
-        steps = []
+        # ...and it ends again at every change of CUTTING STEP within that
+        # run, because a <tier> element carries ONE angle= and ONE depth= for
+        # all of its facets.  A tier holding two steps can only describe one
+        # of them.
+        #
+        # Gem Cut Studio draws the 3D stone straight from the stored
+        # polygons, so such a file still looks perfect on screen; its SHEET
+        # is re-cut from (angle, index, depth) per tier, and there the second
+        # step is dropped along with every later tier that met it.  Saw Tooth
+        # Marquise printed "Total facets 27" over a plan view whose lines do
+        # not close, for 57 facets in the mesh.  Measured 2026-09-25 across
+        # the files this function had written: 3,726 of them held 16,108
+        # tiers with more than one step in, and of the 2,770 that had a Gem
+        # Cut Studio sheet beside them, 798 of those sheets printed short.
+        parts = []
         for f in facets[i:i + run_len]:
-            s = (f.get("instr", "") or "").strip()
-            if s and s not in steps:
-                steps.append(s)
-        instr = " · ".join(steps)
-        # Tier angle/depth tell Gem Cut Studio which section a tier belongs to:
-        #   angle > 90 -> Pavilion (normal points down), < 90 -> Crown,
-        #   == 90 -> Girdle, 0 -> Table.  angle = arccos(nz); depth = |v . n|.
-        n0 = np.asarray(facets[i]["normal"], float)
-        ln = np.linalg.norm(n0)
-        nz = n0[2] / ln if ln > 1e-12 else 0.0
-        t_angle = math.degrees(math.acos(max(-1.0, min(1.0, nz))))
-        v0 = np.asarray(facets[i]["verts"][0], float)
-        t_depth = abs(float(v0 @ (n0 / ln))) if ln > 1e-12 else 0.0
-        te = ET.SubElement(root, "tier", angle=repr(t_angle), depth=repr(t_depth),
-                           name=tier, instructions=instr, visible="true",
-                           guide="false")
-        for _ in range(run_len):
-            f = facets[i]
-            n = f["normal"]
-            fe = ET.SubElement(te, "facet", nx=fmt(n[0]), ny=fmt(n[1]),
-                               nz=fmt(n[2]), index_angle="0")
-            # round-trip the frosted-finish marker (edge-frosting tools)
-            if f.get("frosting") is not None:
-                fe.set("frosting", fmt(f["frosting"]))
-            for v in f["verts"]:
-                ET.SubElement(fe, "vertex", x=fmt(v[0]), y=fmt(v[1]), z=fmt(v[2]))
-            i += 1
+            k = step_key(f)
+            if parts and parts[-1][0] == k:
+                parts[-1][1].append(f)
+            else:
+                parts.append((k, [f]))
+
+        base = name_of(facets[i])
+        for part_no, (_key, part) in enumerate(parts):
+            # The parts of a split tier are lettered - P3, P3b, P3c - because
+            # they are no longer one tier, and leaving them to share a name
+            # would say that they are.  A tier that was not split keeps the
+            # name it came with, untouched.
+            name = base
+            if part_no and base:
+                name = base + STEP_SUFFIX[(part_no - 1) % len(STEP_SUFFIX)]
+            # Every distinct instruction in the part, not just the one it
+            # opens with.  A .gem puts the instruction on the facet that
+            # *begins* a cutting step, so a tier that held several steps
+            # held several lines and reading the first facet alone dropped
+            # the rest.  Splitting on the step gives each of them its own
+            # tier and its own line instead: across 1,700 .gem files, 1,036
+            # held a tier carrying more than one instruction under the old
+            # boundary and none do under this one.  Joining is kept for what
+            # is left - a .gcs stores one instruction on every facet of a
+            # tier, and repeats have to collapse to a single line.
+            steps = []
+            for f in part:
+                text = (f.get("instr", "") or "").strip()
+                if text and text not in steps:
+                    steps.append(text)
+            # Tier angle/depth tell Gem Cut Studio which section a tier
+            # belongs to: angle > 90 -> Pavilion (normal points down),
+            # < 90 -> Crown, == 90 -> Girdle, 0 -> Table.  They come from the
+            # part's own facets, which by now all agree on them.
+            t_angle, t_depth = facet_plane(part[0])
+            te = ET.SubElement(root, "tier", angle=repr(t_angle),
+                               depth=repr(abs(t_depth)), name=name,
+                               instructions=" · ".join(steps),
+                               visible="true", guide="false")
+            for f in part:
+                n = f["normal"]
+                fe = ET.SubElement(
+                    te, "facet", nx=fmt(n[0]), ny=fmt(n[1]), nz=fmt(n[2]),
+                    index_angle=repr(facet_index_angle(n)))
+                # round-trip the frosted-finish marker (edge-frosting tools)
+                if f.get("frosting") is not None:
+                    fe.set("frosting", fmt(f["frosting"]))
+                for v in f["verts"]:
+                    ET.SubElement(fe, "vertex", x=fmt(v[0]), y=fmt(v[1]),
+                                  z=fmt(v[2]))
+        i += run_len
 
     c = material.get("color", (0.82, 0.82, 0.86))
     rnd = ET.SubElement(root, "render", material="(converted from GemCad)",
@@ -690,14 +812,19 @@ def render_view(facets, basis, scale, color, size=620, ss=2,
         sy = verts @ up
         depth = float(np.mean(verts @ forward))
 
+        # one key for both lookups: tier_key() measures the facet's plane to
+        # find its cutting step, which is real work to be doing twice per
+        # facet on every frame of a drag
+        key = tier_key(f) if (names is not None or palette is not None) else None
+
         tier = f["tier"]
         if names is not None:
-            tier = names.get(tier_key(f), tier)
+            tier = names.get(key, tier)
 
         col = base_col
         tinted = False
         if palette is not None:
-            hit = palette.get(tier_key(f))
+            hit = palette.get(key)
             if hit is not None:
                 col, tinted = np.asarray(hit, dtype=float), True
 
@@ -780,19 +907,29 @@ def render_view(facets, basis, scale, color, size=620, ss=2,
 # ----------------------------------------------------------------------------
 
 def tier_key(facet):
-    """What makes two facets the same tier.
+    """What makes two facets the same tier.  All three parts are needed.
 
-    Both halves are needed.  Some designs give two tiers the SAME NAME, so
-    the name alone merges tiers that were cut separately; and a caller that
-    builds facets by hand may reuse a tier id across differently named
-    tiers, which the id alone merges.  Every real file already numbers its
-    tiers uniquely - parse_gcs counts <tier> elements and parse_gem starts a
-    new id at each name change - so this pair splits nothing that tid alone
-    did not.  Everything that groups facets into tiers goes through it -
+    The NAME, because that is what the file calls a tier.  The TID parse_gcs
+    assigns per <tier> element, because some designs give two tiers the SAME
+    name and the name alone would merge tiers that were cut separately -
+    while a caller that builds facets by hand may reuse an id across
+    differently named tiers, which the id alone would merge.
+
+    And the CUTTING STEP - the (angle, depth) plane setting behind the facet
+    - because a stored tier is free to hold facets from more than one step,
+    and a great many converted files do.  A <tier> element carries one angle
+    and one depth, so a tier holding two steps describes only one of them:
+    Gem Cut Studio's sheet re-cuts the stone from what the tiers say and
+    drops the rest of it, and a cutting table that merged the two would
+    print one row claiming a tier was cut at two angles at once.  Splitting
+    on the step is also what lets the viewer read a file repaired by
+    74_fix_mixed_depth_tiers.py the same way the repair grouped it.
+
+    Everything that groups facets into tiers goes through here -
     tier_groups(), tier_labels(), tier_palette() and the captions in
-    render_view() - so a colour, a label and a row in the cutting table
-    can never disagree about what a tier is."""
-    return (facet.get("tid"), facet.get("tier", ""))
+    render_view() - so a colour, a label and a row in the cutting table can
+    never disagree about what a tier is."""
+    return (facet.get("tid"), facet.get("tier", "")) + step_key(facet)
 
 
 def tier_palette(facets, sat=0.34, val=1.0):
@@ -942,7 +1079,9 @@ def tier_groups(facets):
 
     Everything that describes a tier comes through here, so a label, a
     section heading and a row can never disagree about where one tier ends
-    or what part of the stone it belongs to."""
+    or what part of the stone it belongs to.  Where one ends is tier_key()'s
+    ruling: the name, the tier id and the cutting step, so a stored tier
+    holding two steps is two groups here."""
     groups = []
     for f in facets:
         key = tier_key(f)
@@ -982,7 +1121,11 @@ def tier_labels(facets):
     labels = {}
     for key, _, _, kind in tier_groups(facets):
         if key in labels:
-            continue                    # one tier, cut in two passes
+            # The same tier interrupted by another and then resumed at the
+            # same plane setting.  No file can do that - parse_gcs numbers
+            # tiers by element and parse_gem starts a new id at each name
+            # change - but a hand-built facet list with no tid can.
+            continue
         if kind == "table" and "T" not in labels.values():
             labels[key] = "T"
             continue
@@ -1026,13 +1169,15 @@ def tier_table(facets, gear=96.0):
         else:
             idx_str = "Table" if angle < 1.0 else ""
         # A .gem stores the instruction on the facet that starts a cutting
-        # step, and a tier can contain several steps - "Match g1, establish
-        # upper girdle line" and then "Meet g1.a.a.g1" both live in tier a of
-        # Alcyone.  Taking only the first facet's text drops every step but
-        # the first: 322 of the 1,103 .gem files in the reference collection
-        # hold a multi-step tier, 840 steps in all (re-measured 2026-08-11).
-        # Order is preserved and repeats collapse, so a .gcs - which repeats
-        # one tier instruction across every facet - is unaffected.
+        # step, so a tier holding two steps held two lines - "Match g1,
+        # establish upper girdle line" and then "Meet g1.a.a.g1" both lived
+        # in tier a of Alcyone - and reading the first facet alone dropped
+        # the second.  Since tier_key() splits on the step those are two
+        # rows now, one line each: across 1,700 .gem files, 1,036 held a
+        # tier carrying more than one instruction under the old boundary and
+        # none do under this one.  What remains is the .gcs shape, one
+        # instruction repeated on every facet of a tier, which has to
+        # collapse to a single line rather than be echoed per facet.
         instrs = []
         for f in grp:
             s = (f.get("instr", "") or "").strip()

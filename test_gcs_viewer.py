@@ -454,8 +454,9 @@ def test_write_gcs_same_named_tiers(tmp):
     check("same-named tiers: re-read as three tiers",
           len({f["tid"] for f in back}) == 3)
 
-    # a caller that supplies no tid must get exactly the old behaviour, since
-    # every solver script that writes through here builds facets without one
+    # a caller that supplies no tid - every solver script that writes through
+    # here builds facets without one - is grouped by name, and then by the
+    # cutting step, so three cones that share a name are still three tiers
     plain = [{k: v for k, v in f.items() if k != "tid"} for f in facets]
     q = os.path.join(tmp, "notid.gcs")
     gv.write_gcs(q, plain, {"title": "No Tid"}, {"color": (.5, .5, .5)})
@@ -482,17 +483,243 @@ def test_write_gcs_same_named_tiers(tmp):
           ["Cut to a center point"],
           [t.get("instructions") for t in ET.parse(s1).iter("tier")])
 
-    check("no-tid callers still group by name, unchanged",
-          len(list(ET.parse(q).iter("tier"))) == 1,
+    check("no-tid callers group by name and by cutting step",
+          len(list(ET.parse(q).iter("tier"))) == 3,
           len(list(ET.parse(q).iter("tier"))))
 
-    # and a tid that says nothing must not be allowed to merge real tiers
-    flat = [dict(f, tid=0) for f in facets]
+    # and a tid that says nothing must not be allowed to merge real tiers.
+    # The names are what separates them here - the three cones are at three
+    # angles, so the step would separate them too, and this has to fail if
+    # the name rule is dropped rather than pass on the step's account.
+    flat = []
+    for name, angle in (("a", 43.0), ("b", 43.0), ("c", 43.0)):
+        flat += [dict(f, tid=0) for f in cone_facets(8, angle, tier=name)]
     r = os.path.join(tmp, "flattid.gcs")
     gv.write_gcs(r, flat, {"title": "Flat Tid"}, {"color": (.5, .5, .5)})
     check("a constant tid cannot merge what the names separate",
-          len(list(ET.parse(r).iter("tier"))) == 1,
+          len(list(ET.parse(r).iter("tier"))) == 3,
           len(list(ET.parse(r).iter("tier"))))
+
+    # The case the tid rule is the ONLY defence for: two tiers that share a
+    # name AND sit at the same plane setting, told apart by nothing but the
+    # <tier> element they came from.  One ring of facets, cut in two passes
+    # at one setting - the angle is the same, the depth is the same, only
+    # the index positions differ - so neither the name nor the cutting step
+    # separates them and dropping the tid would write them as one tier.
+    passes = cone_facets(8, 43.0, tier="P1", instr="")
+    for n, f in enumerate(passes):
+        f["tid"] = 0 if n < 4 else 1
+    passes[0]["instr"] = "Cut to a center point"   # the .gem shape: the text
+    passes[4]["instr"] = "Meet P1.P1"              # sits on the facet that
+                                                   # opens each pass
+    t = os.path.join(tmp, "twopasses.gcs")
+    gv.write_gcs(t, passes, {"title": "Two Passes"}, {"color": (.5, .5, .5)})
+    two = list(ET.parse(t).iter("tier"))
+    check("one setting cut in two passes stays two tiers",
+          len(two) == 2, len(two))
+    check("two passes: each keeps its own facets",
+          [len(x.findall("facet")) for x in two] == [4, 4],
+          [len(x.findall("facet")) for x in two])
+    check("two passes: each keeps its own instruction",
+          [x.get("instructions") for x in two] ==
+          ["Cut to a center point", "Meet P1.P1"],
+          [x.get("instructions") for x in two])
+
+
+def test_write_gcs_splits_cutting_steps(tmp):
+    """One <tier> per CUTTING STEP, because a tier element carries one
+    angle= and one depth= for all of its facets.
+
+    A tier holding facets at two depths can only describe one of them.  Gem
+    Cut Studio draws the 3D stone from the stored polygons, so such a file
+    still looks perfect on screen; its SHEET is re-cut from (angle, index,
+    depth) per tier, and there the second step is dropped along with every
+    later tier that met it.  Saw Tooth Marquise printed "Total facets 27"
+    over a plan view whose lines do not close, for 57 facets in the mesh.
+    Measured 2026-09-25: 3,726 files written by this function held 16,108
+    such tiers, and 798 of the 2,770 that had a sheet printed short."""
+    import xml.etree.ElementTree as ET
+
+    # one tier name over two cuts at the SAME angle and different depths -
+    # the case a name, a tid and an angle all miss
+    facets = (cone_facets(8, 43.0, r=1.0, tier="P1", instr="Cut to a center point")
+              + cone_facets(8, 43.0, r=0.6, tier="P1", instr="Meet 1.g1.1"))
+    for f in facets:
+        f["tid"] = 0
+
+    p = os.path.join(tmp, "twodepths.gcs")
+    gv.write_gcs(p, facets, {"title": "Two Depths"}, {"color": (.5, .5, .5)})
+    tiers = list(ET.parse(p).iter("tier"))
+    check("cutting steps: two depths under one name are two tiers",
+          len(tiers) == 2, len(tiers))
+
+    for t in tiers:
+        planes = set()
+        for fe in t.findall("facet"):
+            n = np.array([float(fe.get(k)) for k in ("nx", "ny", "nz")])
+            n = n / _np_norm(n)
+            v = np.array([[float(x.get(k)) for k in ("x", "y", "z")]
+                          for x in fe.findall("vertex")])
+            planes.add((round(math.degrees(math.acos(
+                max(-1.0, min(1.0, float(n[2]))))), 4),
+                round(float(np.mean(v @ n)), 5)))
+        check("cutting steps: tier %s holds one plane setting" % t.get("name"),
+              len(planes) == 1, planes)
+        stored = (round(float(t.get("angle")), 4),
+                  round(abs(float(t.get("depth"))), 5))
+        got = planes.pop()
+        check("cutting steps: tier %s stores its own angle and depth"
+              % t.get("name"),
+              stored == (got[0], round(abs(got[1]), 5)), (stored, got))
+
+    check("cutting steps: the split parts are lettered apart",
+          [t.get("name") for t in tiers] == ["P1", "P1b"],
+          [t.get("name") for t in tiers])
+    check("cutting steps: each part keeps its own instruction",
+          [t.get("instructions") for t in tiers] ==
+          ["Cut to a center point", "Meet 1.g1.1"],
+          [t.get("instructions") for t in tiers])
+
+    # nothing about the mesh may move - only where the tier boundaries fall
+    back, _, _ = gv.parse_gcs(p)
+    check("cutting steps: every facet survives", len(back) == len(facets),
+          (len(facets), len(back)))
+    worst = max(float(np.abs(np.asarray(a["verts"], float)
+                             - np.asarray(b["verts"], float)).max())
+                for a, b in zip(facets, back))
+    check("cutting steps: the vertices are untouched", worst < 1e-12, worst)
+    worst_n = max(float(np.abs(np.asarray(a["normal"], float)
+                               - np.asarray(b["normal"], float)).max())
+                  for a, b in zip(facets, back))
+    check("cutting steps: the normals are untouched", worst_n < 1e-12, worst_n)
+
+    # ...and the display splits in the same place, which is what repairs the
+    # files already on disk: this one is read straight from a mixed tier, so
+    # it never goes through write_gcs at all
+    mixed = ('<GemCutStudio version="1000">\n'
+             '  <index gear="96" base="0" symmetry="0" mirror="0" />\n'
+             '  <tier angle="137.0" depth="1.0" name="P1" instructions="Cut">\n')
+    for f in facets:
+        n = f["normal"]
+        mixed += ('    <facet nx="%r" ny="%r" nz="%r" index_angle="0">\n'
+                  % (float(n[0]), float(n[1]), float(n[2])))
+        for v in f["verts"]:
+            mixed += ('      <vertex x="%r" y="%r" z="%r" />\n'
+                      % (float(v[0]), float(v[1]), float(v[2])))
+        mixed += "    </facet>\n"
+    mixed += ('  </tier>\n'
+              '  <info title="Mixed" author="" date="" />\n'
+              '</GemCutStudio>\n')
+    m = os.path.join(tmp, "mixed.gcs")
+    with open(m, "w", encoding="utf-8") as fh:
+        fh.write(mixed)
+    on_disk, _, _ = gv.parse_gcs(m)
+    check("cutting steps: a mixed tier already on disk reads as one <tier>",
+          len({f["tid"] for f in on_disk}) == 1)
+    rows = gv.tier_table(on_disk, gear=96)
+    check("cutting steps: but the cutting table gives it a row per step",
+          len(rows) == 2, [(r["name"], round(r["angle"], 2)) for r in rows])
+    check("cutting steps: numbered as two tiers",
+          [r["name"] for r in rows] == ["P1", "P2"], [r["name"] for r in rows])
+    check("cutting steps: and coloured as two",
+          len(gv.tier_palette(on_disk)) == 2,
+          len(gv.tier_palette(on_disk)))
+
+
+def test_step_key_on_a_boundary(tmp):
+    """Two facets of ONE cut must key alike even when the cut sits exactly on
+    the rounding grid, where the answer is decided by the last bits of a
+    float - and those bits are not stable.  parse_gcs normalises the normal
+    it reads, so a file written and read back carries normals an ulp from the
+    ones that went in.
+
+    Measured before this was guarded: 6 tiers in 2 of 1,593 designs split in
+    two on a boundary - one cut written as two tiers, two identical rows in
+    the cutting table - and 2 designs in 12,632 came back from a round trip
+    with a tier more than they went in with."""
+    import xml.etree.ElementTree as ET
+
+    # One real facet, twice: the normal as it is read from
+    # 04.011A FVS-115.gcs and the normal that same facet has after the file
+    # has been through write_gcs and been read again.  They differ by one
+    # ulp in each component - parse_gcs normalises what it reads, and
+    # normalising a vector that is already 1 - 2**-53 long moves it - and
+    # the faceting angle lands on 138.13865, exactly between two points of
+    # the 4-decimal grid.  Written as hex floats so that no decimal literal
+    # can quietly round one of them on the way in.
+    def fs(*hx):
+        return np.array([float.fromhex(h) for h in hx])
+
+    verts = np.array([
+        fs('0x1.333882f0a9e3ap-1', '-0x1.99988255fcfd2p-1', '0x1.09e03749e2383p-2'),
+        fs('0x1.32aae259db7b8p-1', '-0x1.988a593fefccbp-1', '0x1.07bf3162b072dp-2'),
+        fs('0x1.0cb1765641658p-11', '0x1.5b676b1aab296p-55', '-0x1.376458949739fp-1'),
+        fs('0x1.8c000006a4ceap-53', '0x1.5b8aabb4d7b51p-55', '-0x1.377b612781b20p-1'),
+        fs('0x1.2bfb195dc1c23p-52', '-0x1.c2f8d83ebcc11p-3', '-0x1.b44d03b3c972cp-2'),
+    ])
+    before = fs('0x1.05815a5bc37efp-2', '-0x1.3baa30850d2f6p-1',
+                '-0x1.7d516dbdb1d3ap-1')
+    after = fs('0x1.05815a5bc37f0p-2', '-0x1.3baa30850d2f7p-1',
+               '-0x1.7d516dbdb1d3bp-1')
+
+    def ring(normal):
+        return [{"verts": verts, "normal": normal, "tier": "P1",
+                 "instr": "Cut", "tid": 0} for _ in range(4)]
+
+    a, b = ring(before), ring(after)
+    # the premise: the ulp really does move the raw angle, and it really
+    # does sit on the fence, so rounding alone would answer differently
+    raw_a, raw_b = gv.facet_plane(a[0])[0], gv.facet_plane(b[0])[0]
+    check("boundary: the ulp moves the raw angle", raw_a != raw_b,
+          (repr(raw_a), repr(raw_b)))
+    check("boundary: and rounding alone would split them",
+          round(raw_a, 4) != round(raw_b, 4),
+          (round(raw_a, 4), round(raw_b, 4)))
+    check("boundary: an ulp in the normal does not change the step",
+          gv.step_key(a[0]) == gv.step_key(b[0]),
+          (gv.step_key(a[0]), gv.step_key(b[0])))
+
+    mixed = a[:2] + b[2:]                   # half the ring nudged, one cut
+    check("boundary: one cut stays one tier either way",
+          len(gv.tier_groups(mixed)) == 1,
+          [g[0] for g in gv.tier_groups(mixed)])
+    q = os.path.join(tmp, "boundary.gcs")
+    gv.write_gcs(q, mixed, {"title": "Boundary"}, {"color": (.5, .5, .5)})
+    check("boundary: and is written as one tier",
+          len(list(ET.parse(q).iter("tier"))) == 1,
+          len(list(ET.parse(q).iter("tier"))))
+
+
+def test_write_gcs_index_angle(tmp):
+    """index_angle is the bearing of the facet's normal on the index gear,
+    atan2(-nx, -ny) in degrees.  Gem Cut Studio writes it on every facet and
+    a flat 0 was going out instead, which the conversion pipelines then had
+    a patch of their own to put back.  Checked against 150 of Gem Cut
+    Studio's own files: all 11,651 facets agree exactly."""
+    import xml.etree.ElementTree as ET
+
+    facets = synthetic_stone()
+    p = os.path.join(tmp, "index_angle.gcs")
+    gv.write_gcs(p, facets, {"title": "Index"}, {"color": (.5, .5, .5)})
+
+    worst, flats = 0.0, 0
+    for fe in ET.parse(p).iter("facet"):
+        nx, ny = float(fe.get("nx")), float(fe.get("ny"))
+        stored = float(fe.get("index_angle"))
+        if math.hypot(nx, ny) < 1e-12:
+            flats += 1
+            check("index angle: a flat facet has none", stored == 0.0, stored)
+            continue
+        want = math.degrees(math.atan2(-nx, -ny)) % 360.0
+        worst = max(worst, abs((stored - want + 180) % 360 - 180))
+    check("index angle: written from the normal", worst < 1e-9, worst)
+    check("index angle: the table facet was one of them", flats == 1, flats)
+
+    # the eight facets of a ring sit 45 degrees apart on the gear
+    ring = sorted(float(fe.get("index_angle"))
+                  for fe in ET.parse(p).iter("tier").__next__().findall("facet"))
+    gaps = {round(b - a, 6) for a, b in zip(ring, ring[1:])}
+    check("index angle: a ring of eight is evenly spaced", gaps == {45.0}, gaps)
 
 
 # ---------------------------------------------------------------------------
@@ -1605,6 +1832,9 @@ def main():
         test_write_gcs_roundtrip(tmp)
         test_write_gcs_bytes(tmp)
         test_write_gcs_same_named_tiers(tmp)
+        test_write_gcs_splits_cutting_steps(tmp)
+        test_step_key_on_a_boundary(tmp)
+        test_write_gcs_index_angle(tmp)
         test_parse_gem(tmp)
         test_parse_gem_long_notes(tmp)
         test_parse_gem_no_trailing(tmp)

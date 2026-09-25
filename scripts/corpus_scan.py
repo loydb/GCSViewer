@@ -156,7 +156,11 @@ def roundtrip(path, tmpdir):
         wv = max(wv, float(np.abs(va - vb).max()))
         wn = max(wn, float(np.abs(np.asarray(a["normal"], float) -
                                   np.asarray(b["normal"], float)).max()))
-        if (a.get("tier", "") or "") != (b.get("tier", "") or ""):
+        # A tier that held two cutting steps is written as two, and the
+        # parts are lettered apart - P3, P3b - so the name coming back is
+        # the one that went in, possibly with a letter on the end.  Anything
+        # else is a name that was lost.
+        if not (b.get("tier", "") or "").startswith(a.get("tier", "") or ""):
             tier_bad += 1
 
     # Instructions cannot be compared facet by facet.  A .gem carries the text
@@ -164,11 +168,20 @@ def roundtrip(path, tmpdir):
     # stores one string per tier, which parse_gcs then copies onto every
     # facet.  Moving between those two shapes is the format's doing and loses
     # nothing.  What would be a real loss is a *distinct* step disappearing,
-    # so the comparison is between the ordered sets of instructions per tier.
+    # so the comparison is between the ordered sets of instructions, one set
+    # per cutting step.
+    #
+    # Per STEP - gv.tier_key() - and not per <tier>
+    # element, because that is the unit that has to survive.  A file whose
+    # tiers each held two steps comes back with more <tier> elements than it
+    # went in with, which is the point of writing it: one angle and one
+    # depth per tier is all the format can carry.  Counted by element this
+    # read as "tier count 9 -> 10" on 736 of 1,132 files, every one of them
+    # correct.
     def steps(fs):
         runs, out = [], []
         for x in fs:
-            k = x.get("tid", x.get("tier", ""))
+            k = gv.tier_key(x)
             if not runs or runs[-1][0] != k:
                 runs.append((k, []))
             runs[-1][1].append((x.get("instr", "") or "").strip())
@@ -194,16 +207,15 @@ def roundtrip(path, tmpdir):
     if wn > 1e-12:
         problems.append("normals moved by %.3g" % wn)
     if tier_bad:
-        problems.append("%d tier names changed" % tier_bad)
+        problems.append("%d tier names lost" % tier_bad)
     if len(a_steps) != len(b_steps):
-        problems.append("tier count %d -> %d" % (len(a_steps), len(b_steps)))
+        problems.append("cutting steps %d -> %d" % (len(a_steps), len(b_steps)))
 
     if problems:
         row["verdict"] = "MISMATCH"
         row["detail"] = "; ".join(problems)
     elif dropped:
-        # write_gcs writes one instruction per tier, taken from the facet that
-        # opens it, so a tier holding several steps keeps only the first
+        # a cutting step's text did not come back out of the .gcs at all
         row["verdict"] = "INSTR-LOST"
         row["detail"] = "%d cutting step(s) not carried into the .gcs" % dropped
     else:

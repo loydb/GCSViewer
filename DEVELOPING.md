@@ -112,13 +112,39 @@ synthetic suite could not, all fixed:
   back through the Windows code pages.
 - **Cutting steps were dropped.** In a `.gem` the instruction belongs to the
   facet that *begins* a step and a tier can hold several, so reading only the
-  first lost the rest. Re-measured 2026-08-11 against the collection as it
-  stands: **322 of its 1,103 `.gem` files** hold such a tier, **840 steps** in
-  all.
+  first lost the rest. They were collected and joined with `·`; since the
+  tier boundary moved to the step itself (below) each one is its own tier with
+  its own line, and across **1,700 `.gem` files** not one tier is left holding
+  two instructions — 1,036 of them were, 4,266 lines in all.
 - **`write_gcs` merged tiers sharing a name** — one design went from seven
   tiers to one. Boundaries now follow the element, not the label.
 - **Zero-byte files reported a parser error** rather than saying they were
   empty. Twelve sit in that collection.
 
 Afterwards: no parse failures, no malformed geometry, every design
-round-trips with vertices bit-exact and no tier lost.
+round-trips with vertices bit-exact and no tier lost. Re-run 2026-09-25 over
+**18,003 designs** across five collections: 18,003 round-tripped OK, worst
+vertex difference 0.
+
+A fifth defect surfaced in 2026-09 and needed a different instrument, because
+nothing about the file is malformed and the 3D view of it is perfect:
+
+- **A tier held facets from more than one cutting step.** A `<tier>` carries
+  one `angle=` and one `depth=`, so it can only describe one of them. Gem Cut
+  Studio draws the stone from the stored polygons and shows it correctly; its
+  **sheet** re-cuts the stone from what the tiers say, and drops the rest.
+  *Saw Tooth Marquise* printed "Total facets 27" for a 57-facet mesh.
+  `write_gcs` now ends a tier at a change of cutting step, and `tier_key()`
+  splits on it too so the files already written read correctly.
+
+```bash
+python scripts/check_tier_steps.py "D:\designs" --recut
+```
+
+Reports the tiers holding more than one cutting step — which is exact, the
+file either has one or it does not — and with `--recut` (needs scipy) counts
+the facets a re-cut from the tiers leaves standing. The re-cut is an
+approximation of what the sheet does, not a copy of it: on *Saw Tooth
+Marquise* it leaves 43 of 57 facets standing where Gem Cut Studio printed 27,
+so it shows that facets are lost without saying exactly how many. It is
+read-only.
