@@ -171,7 +171,7 @@ def roundtrip(path, tmpdir):
     # so the comparison is between the ordered sets of instructions, one set
     # per cutting step.
     #
-    # Per STEP - gv.tier_key() - and not per <tier>
+    # Per STEP - gv.tier_keys() - and not per <tier>
     # element, because that is the unit that has to survive.  A file whose
     # tiers each held two steps comes back with more <tier> elements than it
     # went in with, which is the point of writing it: one angle and one
@@ -180,8 +180,7 @@ def roundtrip(path, tmpdir):
     # correct.
     def steps(fs):
         runs, out = [], []
-        for x in fs:
-            k = gv.tier_key(x)
+        for x, k in zip(fs, gv.tier_keys(fs)):
             if not runs or runs[-1][0] != k:
                 runs.append((k, []))
             runs[-1][1].append((x.get("instr", "") or "").strip())

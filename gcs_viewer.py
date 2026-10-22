@@ -411,29 +411,27 @@ def load_design(path):
     return parse_gcs(path)
 
 
-# How exactly two facets must agree before they count as one cutting step.
-# The facets of a step all come off one plane setting, so they agree to about
-# 1e-12.  These are the tolerances the corpus repair uses
-# (Facetdiagrams.org/Scripts/74_fix_mixed_depth_tiers.py, which found with
-# them 16,108 tiers to split across 3,726 files), and this has to keep
-# them, or the viewer would group a repaired file differently from the way
-# it was repaired.
-STEP_ANGLE_DP = 4
-STEP_DEPTH_DP = 5
-
-# ...and the significant digits the value is snapped to before it meets that
-# grid, which is what keeps a facet off the fence.
+# How far apart two facets may be and still be ONE cutting step.
 #
-# A grid has boundaries, and a value that lands on one is decided by its last
-# bits.  Those bits are not stable: parse_gcs normalises the normal it reads,
-# so a file written and read back has normals one ulp from the ones that went
-# in, and the angle moves with them.  Measured over 1,593 designs, 6 tiers in
-# 2 of them split in two on a boundary - one cut, written as two tiers, two
-# identical rows in the table - and two designs in 12,632 came back from a
-# round trip with an extra tier.  Snapping to twelve significant figures is
-# far below anything a design distinguishes and far above the noise; with it,
-# none of them do.
-STEP_SIG_FIGS = 12
+# A TOLERANCE, deliberately, not a grid.  A grid has boundaries, and the
+# facets of one cut routinely sit a few millionths apart: straddle a boundary
+# and one cut becomes two tiers.  That is how PC 21.113 Bravo Alternate
+# Pavilion came to show SEVEN rows for its sixteen-facet 43.00 cut once the
+# file itself had been repaired - its depths span 2.8e-06 either side of
+# 0.521655.  Snapping to twelve significant figures (2026-09-25) cured the
+# one-ulp case and could never cure this one: 2.8e-06 is not float noise.
+#
+# Compared against the group's FIRST facet there is no boundary to straddle.
+# The numbers come from measuring both populations, 2026-10-22, over 4,008
+# files and 64,267 runs of facets sharing a <tier> element:
+#
+#     ONE cut   depth spread <= 9.525e-05   angle spread <= 0.00094 deg
+#     TWO cuts  depth spread >= 0.004537 at one angle, or angle >= 0.0098 deg
+#
+# so these sit in the empty band between them - ten times the widest wobble,
+# and a fifth of the closest genuine pair.
+STEP_DEPTH_TOL = 1e-3
+STEP_ANGLE_TOL = 0.005
 
 # Letters for the parts a split tier is written as: P3, P3b, P3c.
 STEP_SUFFIX = "bcdefghijklmnopqrstuvwxyz"
@@ -490,17 +488,16 @@ def facet_index_angle(normal):
     return math.degrees(math.atan2(-nx, -ny)) % 360.0
 
 
-def _snap(x, figs=None):
-    """x with everything below `figs` significant digits thrown away."""
-    return float("%.*g" % (STEP_SIG_FIGS if figs is None else figs, x))
+def same_step(a, b):
+    """Did these two planes come off one setting of the machine?
 
-
-def step_key(facet):
-    """The cutting step a facet belongs to, quantised so that two facets of
-    one cut cannot be told apart by float noise - see STEP_SIG_FIGS."""
-    angle, depth = facet_plane(facet)
-    return (round(_snap(angle), STEP_ANGLE_DP),
-            round(_snap(depth), STEP_DEPTH_DP))
+    `a` and `b` are facet_plane() pairs.  Compare a facet against the one
+    that OPENED its group, never against its predecessor: a long run of
+    facets each within tolerance of the last could otherwise drift any
+    distance at all.  See STEP_DEPTH_TOL for the measurements behind the
+    numbers."""
+    return (abs(a[0] - b[0]) <= STEP_ANGLE_TOL
+            and abs(a[1] - b[1]) <= STEP_DEPTH_TOL)
 
 
 def write_gcs(path, facets, info, material, gear=96):
@@ -566,14 +563,14 @@ def write_gcs(path, facets, info, material, gear=96):
         # Cut Studio sheet beside them, 798 of those sheets printed short.
         parts = []
         for f in facets[i:i + run_len]:
-            k = step_key(f)
-            if parts and parts[-1][0] == k:
+            plane = facet_plane(f)
+            if parts and same_step(parts[-1][0], plane):
                 parts[-1][1].append(f)
             else:
-                parts.append((k, [f]))
+                parts.append((plane, [f]))
 
         base = name_of(facets[i])
-        for part_no, (_key, part) in enumerate(parts):
+        for part_no, (_plane, part) in enumerate(parts):
             # The parts of a split tier are lettered - P3, P3b, P3c - because
             # they are no longer one tier, and leaving them to share a name
             # would say that they are.  A tier that was not split keeps the
@@ -805,8 +802,13 @@ def render_view(facets, basis, scale, color, size=620, ss=2,
     halfway = lgt + cam_dir
     halfway = halfway / np.linalg.norm(halfway)
 
+    # one grouping pass for the whole frame: a facet's tier depends on the
+    # facets around it, so it cannot be worked out inside the loop
+    keys = tier_keys(facets) if (names is not None or palette is not None) \
+        else None
+
     drawables = []
-    for f in facets:
+    for fi, f in enumerate(facets):
         n = f["normal"]
         if float(np.dot(n, forward)) >= -1e-6:     # back-facing -> skip
             continue
@@ -815,10 +817,7 @@ def render_view(facets, basis, scale, color, size=620, ss=2,
         sy = verts @ up
         depth = float(np.mean(verts @ forward))
 
-        # one key for both lookups: tier_key() measures the facet's plane to
-        # find its cutting step, which is real work to be doing twice per
-        # facet on every frame of a drag
-        key = tier_key(f) if (names is not None or palette is not None) else None
+        key = keys[fi] if keys is not None else None
 
         tier = f["tier"]
         if names is not None:
@@ -909,30 +908,25 @@ def render_view(facets, basis, scale, color, size=620, ss=2,
 # Composite of the four panels
 # ----------------------------------------------------------------------------
 
-def tier_key(facet):
-    """What makes two facets the same tier.  All three parts are needed.
+def tier_keys(facets):
+    """One key per facet, in the order given - what each facet's tier is.
 
-    The NAME, because that is what the file calls a tier.  The TID parse_gcs
-    assigns per <tier> element, because some designs give two tiers the SAME
-    name and the name alone would merge tiers that were cut separately -
-    while a caller that builds facets by hand may reuse an id across
-    differently named tiers, which the id alone would merge.
+    There is deliberately no tier_key(facet) any more.  A facet's tier
+    cannot be read off the facet alone: whether it opens a new step or
+    continues the one before depends on the facets around it, and any rule
+    that tried to decide it per-facet needed a grid, which is what split one
+    cut into seven tiers on Bravo Alternate Pavilion.  tier_groups() decides
+    once and everything else reads the answer from here.
 
-    And the CUTTING STEP - the (angle, depth) plane setting behind the facet
-    - because a stored tier is free to hold facets from more than one step,
-    and a great many converted files do.  A <tier> element carries one angle
-    and one depth, so a tier holding two steps describes only one of them:
-    Gem Cut Studio's sheet re-cuts the stone from what the tiers say and
-    drops the rest of it, and a cutting table that merged the two would
-    print one row claiming a tier was cut at two angles at once.  Splitting
-    on the step is also what lets the viewer read a file repaired by
-    74_fix_mixed_depth_tiers.py the same way the repair grouped it.
-
-    Everything that groups facets into tiers goes through here -
-    tier_groups(), tier_labels(), tier_palette() and the captions in
-    render_view() - so a colour, a label and a row in the cutting table can
-    never disagree about what a tier is."""
-    return (facet.get("tid"), facet.get("tier", "")) + step_key(facet)
+    A key is (tid, name, part), where part counts 0, 1, 2... for the pieces
+    of one <tier> element that hold different cutting steps.  The tid and
+    the name are both needed: some designs give two tiers the same name, and
+    a caller building facets by hand may reuse an id across differently
+    named ones."""
+    out = []
+    for key, grp, _angle, _kind in tier_groups(facets):
+        out.extend([key] * len(grp))
+    return out
 
 
 def tier_palette(facets, sat=0.34, val=1.0):
@@ -945,8 +939,7 @@ def tier_palette(facets, sat=0.34, val=1.0):
     and a stone with forty tiers still separates.  Pale and unsaturated so
     the shading still reads as shape: these are labels, not paint."""
     order = []
-    for f in facets:
-        k = tier_key(f)
+    for k in tier_keys(facets):
         if k not in order:
             order.append(k)
     step = 0.6180339887498949                  # golden angle, in turns
@@ -1082,15 +1075,27 @@ def tier_groups(facets):
 
     Everything that describes a tier comes through here, so a label, a
     section heading and a row can never disagree about where one tier ends
-    or what part of the stone it belongs to.  Where one ends is tier_key()'s
-    ruling: the name, the tier id and the cutting step, so a stored tier
-    holding two steps is two groups here."""
-    groups = []
+    or what part of the stone it belongs to.  This is where a tier begins
+    and ends, and the only place it is decided: the tier id, the name, and
+    the cutting step the facets sit at.  A stored <tier> holding two steps
+    is two groups here; one holding sixteen facets that wobble a few
+    millionths apart is ONE (see STEP_DEPTH_TOL)."""
+    runs = []
     for f in facets:
-        key = tier_key(f)
-        if not groups or key != groups[-1][0]:
-            groups.append((key, []))
-        groups[-1][1].append(f)
+        ident = (f.get("tid"), f.get("tier", ""))
+        plane = facet_plane(f)
+        if runs and runs[-1][0] == ident and same_step(runs[-1][2], plane):
+            runs[-1][1].append(f)
+        else:
+            runs.append((ident, [f], plane))
+
+    # number the pieces of a split <tier> so their keys differ; a tier that
+    # was not split is part 0 and reads as the plain (tid, name) it always was
+    groups, parts = [], {}
+    for ident, grp, _plane in runs:
+        n = parts.get(ident, 0)
+        parts[ident] = n + 1
+        groups.append((ident + (n,), grp))
 
     out = []
     for key, grp in groups:

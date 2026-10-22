@@ -71,7 +71,15 @@ def mixed(facets):
     one cutting step."""
     bad = []
     for (_tid, name), grp in tiers_of(facets):
-        steps = list(dict.fromkeys(gv.step_key(f) for f in grp))
+        # A tier's facets are one cutting step unless two of them sit at
+        # genuinely different plane settings - gv.same_step() decides, with
+        # a tolerance rather than a grid (see STEP_DEPTH_TOL).  Measured
+        # against the facet that OPENED the step, as tier_groups() does.
+        steps = []
+        for f in grp:
+            plane = gv.facet_plane(f)
+            if not any(gv.same_step(s, plane) for s in steps):
+                steps.append(plane)
         if len(steps) > 1:
             bad.append((name, steps))
     return bad

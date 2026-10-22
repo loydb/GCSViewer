@@ -626,62 +626,71 @@ def test_write_gcs_splits_cutting_steps(tmp):
           len(gv.tier_palette(on_disk)))
 
 
-def test_step_key_on_a_boundary(tmp):
-    """Two facets of ONE cut must key alike even when the cut lands on the
-    rounding grid, where the answer is decided by the last bits of a float -
-    and those bits are not stable.  parse_gcs normalises the normal it
-    reads, so a file written and read back carries normals an ulp from the
-    ones that went in, and the plane measured off them moves with it.
+def test_one_cut_survives_a_wobble(tmp):
+    """The facets of ONE cut sit a few millionths apart, and that must not
+    make them two tiers.
 
-    Measured before this was guarded: 6 tiers in 2 of 1,593 designs split in
-    two on a boundary - one cut written as two tiers, two identical rows in
-    the cutting table - and 2 designs in 12,632 came back from a round trip
-    with a tier more than they went in with.
+    This was a grid before, and a grid has boundaries.  PC 21.113 Bravo
+    Alternate Pavilion cuts sixteen facets in one .asc line; their stored
+    depths span 2.8e-06 either side of the five-decimal line at 0.521655, so
+    three rounded down and four rounded up, and because grouping runs in
+    facet order the alternation became SEVEN tiers for one cut.  Snapping to
+    twelve significant figures cured the one-ulp case and could never cure
+    this: 2.8e-06 is not float noise.
 
-    The pair below straddles in DEPTH, not in angle, and that is deliberate.
-    An earlier version used two normals an ulp apart and relied on acos
-    landing either side of the fence; it does under the Windows CRT and does
-    not under glibc, which rounds acos the other way, so the premise held on
-    one platform and not the other.  Here both facets carry the SAME nz, so
-    acos is handed the same double everywhere and the angle cannot differ;
-    the single vertex sits on the x axis against a normal with ny = 0, so
-    v . n is one product and two exact zeros - no summation order, no FMA.
-    Verified under both libms."""
+    Measured 2026-10-22 over 4,008 files and 64,267 runs of facets sharing a
+    <tier>: one cut spans at most 9.525e-05 of depth, while two cuts in one
+    tier are at least 0.004537 apart at a single angle.  The tolerances live
+    in that empty band."""
     import xml.etree.ElementTree as ET
 
-    nz = -0.75
-    nx = math.sqrt(1.0 - nz * nz)          # ny = 0, so this is already unit
-    x = float.fromhex("0x1.3d0f40a5e2e9cp-15")   # puts x*nx on the fence
+    def ring(depth_offsets, angle=43.0):
+        """Facets of one cut, each nudged off the plane by its own amount."""
+        out = []
+        base = cone_facets(len(depth_offsets), angle, tier="P1", instr="Cut")
+        for f, off in zip(base, depth_offsets):
+            n = np.asarray(f["normal"], float)
+            n = n / _np_norm(n)
+            f = dict(f, verts=np.asarray(f["verts"], float) + n * off, tid=0)
+            out.append(f)
+        return out
 
-    def one(n_x):
-        return {"verts": np.array([[x, 0.0, 0.0]]),
-                "normal": np.array([n_x, 0.0, nz]),
-                "tier": "P1", "instr": "Cut", "tid": 0}
+    # Bravo's own magnitude, straddling what used to be the fence
+    wobble = ring([0.0, 2.8e-06, 1.1e-06, 2.0e-06, 0.4e-06, 2.6e-06,
+                   1.5e-06, 0.9e-06])
+    spread = (max(gv.facet_plane(f)[1] for f in wobble)
+              - min(gv.facet_plane(f)[1] for f in wobble))
+    check("wobble: the test really does wobble", 1e-6 < spread < 1e-4, spread)
+    check("wobble: one cut stays one tier",
+          len(gv.tier_groups(wobble)) == 1,
+          [g[0] for g in gv.tier_groups(wobble)])
+    check("wobble: every facet gets the same key",
+          len(set(gv.tier_keys(wobble))) == 1, set(gv.tier_keys(wobble)))
 
-    a, b = one(nx), one(math.nextafter(nx, 2.0))
-    pa, pb = gv.facet_plane(a), gv.facet_plane(b)
+    w = os.path.join(tmp, "wobble.gcs")
+    gv.write_gcs(w, wobble, {"title": "Wobble"}, {"color": (.5, .5, .5)})
+    check("wobble: and is written as one <tier>",
+          len(list(ET.parse(w).iter("tier"))) == 1,
+          len(list(ET.parse(w).iter("tier"))))
 
-    check("boundary: the two facets are at the same angle",
-          pa[0] == pb[0], (repr(pa[0]), repr(pb[0])))
-    check("boundary: their depths differ by an ulp",
-          pa[1] != pb[1] and abs(pa[1] - pb[1]) < 1e-19,
-          (repr(pa[1]), repr(pb[1])))
-    check("boundary: so rounding alone would put them in different tiers",
-          round(pa[1], gv.STEP_DEPTH_DP) != round(pb[1], gv.STEP_DEPTH_DP),
-          (round(pa[1], gv.STEP_DEPTH_DP), round(pb[1], gv.STEP_DEPTH_DP)))
-    check("boundary: snapping first does not",
-          gv.step_key(a) == gv.step_key(b), (gv.step_key(a), gv.step_key(b)))
+    # ...while a genuine second cut in the same tier still splits
+    two = ring([0.0] * 4) + ring([0.02] * 4)
+    for f in two:
+        f["tier"], f["tid"] = "P1", 0
+    check("wobble: two real cuts in one tier are still two tiers",
+          len(gv.tier_groups(two)) == 2,
+          [g[0] for g in gv.tier_groups(two)])
 
-    # ...and the whole way through: one cut, one tier, one <tier> written
-    cut = [dict(a), dict(a), dict(b), dict(b)]
-    check("boundary: one cut stays one tier",
-          len(gv.tier_groups(cut)) == 1,
-          [g[0] for g in gv.tier_groups(cut)])
-    q = os.path.join(tmp, "boundary.gcs")
-    gv.write_gcs(q, cut, {"title": "Boundary"}, {"color": (.5, .5, .5)})
-    check("boundary: and is written as one tier",
-          len(list(ET.parse(q).iter("tier"))) == 1,
-          len(list(ET.parse(q).iter("tier"))))
+    # the tolerance is measured from the facet that OPENED the group, never
+    # from the one before it - otherwise a long run could drift any distance
+    # while every neighbour stayed inside the tolerance
+    drift = ring([i * gv.STEP_DEPTH_TOL * 0.6 for i in range(8)])
+    far = (gv.facet_plane(drift[-1])[1] - gv.facet_plane(drift[0])[1])
+    check("wobble: the drift case really drifts past the tolerance",
+          far > gv.STEP_DEPTH_TOL, far)
+    check("wobble: a drifting run does not all merge",
+          len(gv.tier_groups(drift)) > 1,
+          len(gv.tier_groups(drift)))
 
 
 def test_write_gcs_index_angle(tmp):
@@ -894,7 +903,7 @@ def test_tier_labels():
     someone whose alphabet is not this one."""
     facets = synthetic_stone()
     labels = gv.tier_labels(facets)
-    kinds = {gv.tier_key(f): None for f in facets}
+    kinds = dict.fromkeys(gv.tier_keys(facets))
     check("labels: one per tier", len(labels) == len(kinds),
           (len(labels), len(kinds)))
     check("labels: the convention, in cutting order",
@@ -904,16 +913,15 @@ def test_tier_labels():
     # the case this exists for: a design whose tiers are a, b, c, d
     lettered = [dict(f) for f in facets]
     seen, letters = {}, iter("abcdefghij")
-    for f in lettered:
-        k = gv.tier_key(f)
+    for f, k in zip(lettered, gv.tier_keys(lettered)):
         if k not in seen:
             seen[k] = next(letters)
         f["tier"] = seen[k]
     named = gv.tier_labels(lettered)
     check("labels: an alphabet of tier names still reads P/G/C/T",
-          [named[gv.tier_key(f)] for f in lettered][::8][:4] ==
+          [named[k] for k in gv.tier_keys(lettered)][::8][:4] ==
           ["P1", "G1", "C1", "T"],
-          [named[gv.tier_key(f)] for f in lettered][::8][:4])
+          [named[k] for k in gv.tier_keys(lettered)][::8][:4])
     rows = gv.tier_table(lettered, gear=96)
     check("labels: the table shows the derived name and nothing else",
           [r["name"] for r in rows] == ["P1", "G1", "C1", "T"],
@@ -931,9 +939,9 @@ def test_tier_labels():
         f["tid"] = i // 8
     seq = gv.tier_labels(many)
     check("labels: numbering runs per part of the stone",
-          [seq[k] for k in dict.fromkeys(gv.tier_key(f) for f in many)] ==
+          [seq[k] for k in dict.fromkeys(gv.tier_keys(many))] ==
           ["P1", "G1", "C1", "P2"],
-          [seq[k] for k in dict.fromkeys(gv.tier_key(f) for f in many)])
+          [seq[k] for k in dict.fromkeys(gv.tier_keys(many))])
 
     # a facet within half a degree of the girdle plane is a girdle tier;
     # a stored 89.99999 is ordinary and must not read as a pavilion tier
@@ -1355,7 +1363,7 @@ def test_tier_colors():
     check("tier colours: the same stone gives the same colours",
           gv.tier_palette(facets) == pal)
     check("tier colours: every facet finds its colour",
-          all(gv.tier_key(f) in pal for f in facets))
+          all(k in pal for k in gv.tier_keys(facets)))
     check("tier colours: they are pale enough to shade on",
           all(min(c) > 0.4 and max(c) > 0.9 for c in pal.values()),
           [tuple(round(x, 2) for x in c) for c in pal.values()])
@@ -1363,8 +1371,7 @@ def test_tier_colors():
     # two tiers the file happens to name the same are still two tiers - the
     # palette must split them exactly where the cutting table does
     same, tid, prev = [], -1, object()
-    for f in facets:
-        k = gv.tier_key(f)
+    for f, k in zip(facets, gv.tier_keys(facets)):
         if k != prev:
             tid, prev = tid + 1, k
         same.append(dict(f, tier="X", tid=tid))
@@ -1827,7 +1834,7 @@ def main():
         test_write_gcs_bytes(tmp)
         test_write_gcs_same_named_tiers(tmp)
         test_write_gcs_splits_cutting_steps(tmp)
-        test_step_key_on_a_boundary(tmp)
+        test_one_cut_survives_a_wobble(tmp)
         test_write_gcs_index_angle(tmp)
         test_parse_gem(tmp)
         test_parse_gem_long_notes(tmp)

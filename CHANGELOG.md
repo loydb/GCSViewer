@@ -23,9 +23,10 @@ executable whose frozen code does not match the committed source.
   16,108 such tiers, and of the 2,770 with a Gem Cut Studio sheet beside
   them, 798 printed short.
 - The same boundary now governs the display, so a **file already on disk**
-  reads correctly without being rewritten: `tier_key()` splits on the cutting
-  step, and the labels, the colours, the captions and the cutting table all
-  follow it. A row can no longer claim a tier was cut at two angles at once.
+  reads correctly without being rewritten: `tier_groups()` splits on the
+  cutting step, and the labels, the colours, the captions and the cutting
+  table all follow it. A row can no longer claim a tier was cut at two angles
+  at once.
 - It also sorts out the `.gem` cutting instructions, which used to be crammed
   into one row joined by `·` because the steps they belonged to were crammed
   into one tier. Across **1,700 `.gem` files, 1,036 held a tier carrying more
@@ -33,17 +34,29 @@ executable whose frozen code does not match the committed source.
   this one, none do — each step is its own tier with its own line. The
   joining stays for what it was always for: a `.gcs` repeats one instruction
   on every facet of a tier, and that has to collapse to a single line.
-- A cutting step is recognised by its angle and depth on a four- and
-  five-decimal grid, and a grid has boundaries a float can sit on. Those last
-  bits are not stable — `parse_gcs` normalises the normal it reads, so a file
-  written and read again carries normals an ulp from the ones that went in —
-  so the value is snapped to twelve significant figures before it meets the
-  grid. Without that, **6 tiers across 2 of 1,593 designs split in two on a
-  boundary** (one cut written as two tiers, two identical rows in the table),
-  and 2 designs in 12,632 came back from a round trip with a tier more than
-  they went in with. With it, none do. Those counts are from Windows: the
-  Windows CRT and glibc round `acos` differently in the last bit, so the
-  hazard is the same everywhere but *which* facets sit on a fence is not.
+- **A cutting step is recognised by a tolerance, not by a grid**, because a
+  grid has boundaries and the facets of one cut routinely sit a few millionths
+  apart. *PC 21.113 Bravo Alternate Pavilion* cuts sixteen facets in one
+  `.asc` line; their depths span 2.8e-06 either side of the old five-decimal
+  line at 0.521655, so three rounded down and four rounded up, and since
+  grouping runs in facet order the alternation became **seven tiers for one
+  cut**. Each facet is now compared against the one that OPENED its step —
+  against the opener, never its predecessor, or a long run could drift any
+  distance while every neighbour stayed inside the tolerance.
+- The tolerances come from measuring both populations over **4,008 files and
+  64,267 runs** of facets sharing a `<tier>`: one cut spans at most
+  **9.525e-05** of depth and 0.00094°, while two cuts in one tier are at least
+  **0.004537** apart at a single angle, or 0.0098° apart in angle. `STEP_DEPTH_TOL`
+  and `STEP_ANGLE_TOL` sit in the empty band between — ten times the widest
+  wobble, a fifth of the closest genuine pair. This also retires the
+  twelve-significant-figure snap, which cured the one-ulp case and could never
+  have cured this one.
+- **`tier_key(facet)` is gone, replaced by `tier_keys(facets)`** — a list of
+  keys parallel to the facets. A facet's tier cannot be read off the facet
+  alone: whether it opens a step or continues the one before depends on the
+  facets around it, and every rule that tried to decide it per-facet needed a
+  grid. `tier_groups()` decides once and the labels, colours, captions and
+  table rows all read the answer from there.
 - **`index_angle` is written from the facet's normal** — `atan2(-nx, -ny)` in
   degrees — instead of a flat `0` on every facet. It matches Gem Cut Studio's
   own value exactly on all 11,651 facets of 150 of its own files. (Its
@@ -94,12 +107,12 @@ executable whose frozen code does not match the committed source.
   forty tiers still separates. The colours are the same every run, so two
   sheets of the same design can be compared, and they are recomputed per
   design, so stepping through a folder never carries a colour across.
-- `tier_key()` now says what makes two facets the same tier, and both the
-  cutting table and the palette use it — a colour and its row cannot disagree
-  about where one tier ends. It takes the tier id, the name and the cutting
-  step: some designs name two tiers alike, a caller building facets by hand
-  may reuse an id, and a stored tier is free to hold facets from more than
-  one cut.
+- `tier_groups()` says what makes two facets the same tier, and the cutting
+  table, the labels and the palette all read it — a colour and its row cannot
+  disagree about where one tier ends. It takes the tier id, the name and the
+  cutting step: some designs name two tiers alike, a caller building facets by
+  hand may reuse an id, and a stored tier is free to hold facets from more
+  than one cut.
 - The README animation is regenerated, and now ticks and unticks the checkbox
   as it turns the stone — the two things about the window that a still picture
   cannot say. It draws the control row into the seam `compose(split=True)`

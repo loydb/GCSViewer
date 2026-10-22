@@ -81,16 +81,21 @@ MUTATIONS = [
      "                    steps.append(text)"),
     ("write a tier holding two cutting steps as one tier again - the defect "
      "that printed 27 of 57 facets on a Gem Cut Studio sheet",
-     "            if parts and parts[-1][0] == k:",
+     "            if parts and same_step(parts[-1][0], plane):",
      "            if parts:"),
     ("let a label, a colour and a cutting-table row merge two cutting steps",
-     '    return (facet.get("tid"), facet.get("tier", "")) + step_key(facet)',
-     '    return (facet.get("tid"), facet.get("tier", ""))'),
-    ("let a float's last bits decide which tier a facet is in",
-     "    return (round(_snap(angle), STEP_ANGLE_DP),\n"
-     "            round(_snap(depth), STEP_DEPTH_DP))",
-     "    return (round(angle, STEP_ANGLE_DP),\n"
-     "            round(depth, STEP_DEPTH_DP))"),
+     "        if runs and runs[-1][0] == ident and same_step(runs[-1][2], plane):",
+     "        if runs and runs[-1][0] == ident:"),
+    ("split one cut into several tiers again, the way a grid used to",
+     "STEP_DEPTH_TOL = 1e-3",
+     "STEP_DEPTH_TOL = 1e-12"),
+    ("measure the tolerance from the facet before instead of the one that "
+     "opened the step, so a long run can drift any distance",
+     "        if runs and runs[-1][0] == ident and same_step(runs[-1][2], plane):\n"
+     "            runs[-1][1].append(f)",
+     "        if runs and runs[-1][0] == ident and same_step(\n"
+     "                facet_plane(runs[-1][1][-1]), plane):\n"
+     "            runs[-1][1].append(f)"),
     ("write a flat index_angle of 0 on every facet again",
      "                    index_angle=repr(facet_index_angle(n)))",
      '                    index_angle="0")'),
