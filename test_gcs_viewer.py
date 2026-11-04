@@ -22,6 +22,7 @@ import os
 import struct
 import sys
 import tempfile
+from xml.etree import ElementTree
 
 import numpy as np
 
@@ -384,7 +385,7 @@ def test_write_gcs_roundtrip(tmp):
     # the <tier angle=""> attribute is how Gem Cut Studio decides Pavilion vs
     # Crown, so a wrong sign here silently mis-sections an imported stone
     import xml.etree.ElementTree as ET
-    tiers = {t.get("name"): float(t.get("angle")) for t in ET.parse(p).iter("tier")}
+    tiers = {t.get("name"): float(t.get("angle")) for t in gv._read_xml(p).iter("tier")}
     check("roundtrip: pavilion tier angle > 90", tiers["P1"] > 90.0, tiers)
     check("roundtrip: girdle tier angle == 90", near(tiers["g1"], 90.0, 1e-6),
           tiers)
@@ -407,12 +408,14 @@ def test_write_gcs_bytes(tmp):
     raw = open(p, "rb").read()
     check("bytes: line endings are LF, whatever the platform",
           b"\r\n" not in raw, raw[:80])
-    check("bytes: and it is valid UTF-8", raw.decode("utf-8") is not None)
+    check("bytes: no XML declaration", not raw.lstrip().startswith(b"<?xml"),
+          raw[:40])
 
-    # A title outside the machine's code page must survive being written; on
-    # a machine with a legacy code page the old path raised instead.  The
-    # check names stay ASCII - naming them after the titles is what made an
-    # earlier version of this test kill the run on a cp1252 console.
+    # Every title must survive being written; on a machine with a legacy
+    # code page the old path raised instead.  Those outside cp1252 come back
+    # through an XML character reference.  The check names stay ASCII -
+    # naming them after the titles is what made an earlier version of this
+    # test kill the run on a cp1252 console.
     for label, title in (("an accented Latin title", "Fleur en rêve"),
                          ("a CJK title", "Hoa Sen 花"),
                          ("a Greek title", "Ω omega")):
@@ -421,6 +424,49 @@ def test_write_gcs_bytes(tmp):
         back = gv.parse_gcs(q)[1].get("title")
         check("bytes: %s survives a write and re-read" % label,
               back == title, repr(back))
+    raw = open(q, "rb").read()
+    check("bytes: a character outside cp1252 is a character reference",
+          b'title="&#937; omega"' in raw, raw[-120:])
+
+
+def test_write_gcs_cp1252(tmp):
+    """write_gcs writes cp1252, the code page Gem Cut Studio reads .gcs in.
+
+    It used to write UTF-8 with no declaration.  Gem Cut Studio read that as
+    cp1252, so the middle dot joining a tier's instructions - C2 B7 in UTF-8
+    - showed as A-circumflex plus a middle dot, and 414 files were repaired
+    by hand on 2026-11-04.  Here a title and an instruction carrying the
+    middle dot and an a-grave go through write_gcs, and the BYTES are decoded
+    as cp1252 directly, not through parse_gcs, whose UTF-8-then-cp1252
+    fallback would read either encoding and hide a regression.
+    """
+    facets = synthetic_stone()
+    title = "Phan Thành Trung · Test"
+    instr = "Cut to center · meet the girdle à la ligne"
+    # two different instructions on one tier, so the writer's own " · " join
+    # is exercised as well as a dot inside an instruction
+    first = [f for f in facets if f["tier"] == facets[0]["tier"]]
+    first[0]["instr"] = instr
+    first[1]["instr"] = "step à"
+    p = os.path.join(tmp, "cp1252.gcs")
+    gv.write_gcs(p, facets, {"title": title}, {"color": (.5, .5, .5)})
+    raw = open(p, "rb").read()
+
+    check("cp1252: the middle dot is the single byte B7",
+          b"\xb7" in raw and b"\xc2\xb7" not in raw)
+    check("cp1252: a-grave is the single byte E0",
+          b"\xe0" in raw and b"\xc3\xa0" not in raw)
+    text = raw.decode("cp1252")             # strict: every byte must decode
+    root = ElementTree.fromstring(text)
+    got = root.find("info").get("title")
+    check("cp1252: the title round-trips", got == title, ascii(got))
+    instrs = [t.get("instructions") for t in root.findall("tier")]
+    check("cp1252: the joined instructions round-trip",
+          any((instr + " · step à") in t for t in instrs), ascii(instrs))
+    # and the program's own reader agrees with the plain decode
+    back = gv.parse_gcs(p)[1].get("title")
+    check("cp1252: parse_gcs reads the title back", back == title,
+          ascii(back))
 
 
 def test_write_gcs_same_named_tiers(tmp):
@@ -438,7 +484,7 @@ def test_write_gcs_same_named_tiers(tmp):
     p = os.path.join(tmp, "samename.gcs")
     gv.write_gcs(p, facets, {"title": "Same Name"}, {"color": (.5, .5, .5)})
     import xml.etree.ElementTree as ET
-    tiers = list(ET.parse(p).iter("tier"))
+    tiers = list(gv._read_xml(p).iter("tier"))
     check("same-named tiers: three tiers written, not one", len(tiers) == 3,
           len(tiers))
     check("same-named tiers: each keeps its own instruction",
@@ -467,7 +513,7 @@ def test_write_gcs_same_named_tiers(tmp):
     multi[4]["instr"] = "Meet 1.g1.1"
     m = os.path.join(tmp, "multistep.gcs")
     gv.write_gcs(m, multi, {"title": "Multi"}, {"color": (.5, .5, .5)})
-    written = [t.get("instructions") for t in ET.parse(m).iter("tier")]
+    written = [t.get("instructions") for t in gv._read_xml(m).iter("tier")]
     check("multi-step tiers: every step is carried into the .gcs",
           written == ["Cut to a center point · Meet 1.g1.1"], written)
     back_m, _, _ = gv.parse_gcs(m)
@@ -479,13 +525,13 @@ def test_write_gcs_same_named_tiers(tmp):
     s1 = os.path.join(tmp, "single.gcs")
     gv.write_gcs(s1, single, {}, {"color": (.5, .5, .5)})
     check("multi-step tiers: a repeated instruction is not duplicated",
-          [t.get("instructions") for t in ET.parse(s1).iter("tier")] ==
+          [t.get("instructions") for t in gv._read_xml(s1).iter("tier")] ==
           ["Cut to a center point"],
-          [t.get("instructions") for t in ET.parse(s1).iter("tier")])
+          [t.get("instructions") for t in gv._read_xml(s1).iter("tier")])
 
     check("no-tid callers group by name and by cutting step",
-          len(list(ET.parse(q).iter("tier"))) == 3,
-          len(list(ET.parse(q).iter("tier"))))
+          len(list(gv._read_xml(q).iter("tier"))) == 3,
+          len(list(gv._read_xml(q).iter("tier"))))
 
     # and a tid that says nothing must not be allowed to merge real tiers.
     # The names are what separates them here - the three cones are at three
@@ -497,8 +543,8 @@ def test_write_gcs_same_named_tiers(tmp):
     r = os.path.join(tmp, "flattid.gcs")
     gv.write_gcs(r, flat, {"title": "Flat Tid"}, {"color": (.5, .5, .5)})
     check("a constant tid cannot merge what the names separate",
-          len(list(ET.parse(r).iter("tier"))) == 3,
-          len(list(ET.parse(r).iter("tier"))))
+          len(list(gv._read_xml(r).iter("tier"))) == 3,
+          len(list(gv._read_xml(r).iter("tier"))))
 
     # The case the tid rule is the ONLY defence for: two tiers that share a
     # name AND sit at the same plane setting, told apart by nothing but the
@@ -514,7 +560,7 @@ def test_write_gcs_same_named_tiers(tmp):
                                                    # opens each pass
     t = os.path.join(tmp, "twopasses.gcs")
     gv.write_gcs(t, passes, {"title": "Two Passes"}, {"color": (.5, .5, .5)})
-    two = list(ET.parse(t).iter("tier"))
+    two = list(gv._read_xml(t).iter("tier"))
     check("one setting cut in two passes stays two tiers",
           len(two) == 2, len(two))
     check("two passes: each keeps its own facets",
@@ -549,7 +595,7 @@ def test_write_gcs_splits_cutting_steps(tmp):
 
     p = os.path.join(tmp, "twodepths.gcs")
     gv.write_gcs(p, facets, {"title": "Two Depths"}, {"color": (.5, .5, .5)})
-    tiers = list(ET.parse(p).iter("tier"))
+    tiers = list(gv._read_xml(p).iter("tier"))
     check("cutting steps: two depths under one name are two tiers",
           len(tiers) == 2, len(tiers))
 
@@ -670,8 +716,8 @@ def test_one_cut_survives_a_wobble(tmp):
     w = os.path.join(tmp, "wobble.gcs")
     gv.write_gcs(w, wobble, {"title": "Wobble"}, {"color": (.5, .5, .5)})
     check("wobble: and is written as one <tier>",
-          len(list(ET.parse(w).iter("tier"))) == 1,
-          len(list(ET.parse(w).iter("tier"))))
+          len(list(gv._read_xml(w).iter("tier"))) == 1,
+          len(list(gv._read_xml(w).iter("tier"))))
 
     # ...while a genuine second cut in the same tier still splits
     two = ring([0.0] * 4) + ring([0.02] * 4)
@@ -706,7 +752,7 @@ def test_write_gcs_index_angle(tmp):
     gv.write_gcs(p, facets, {"title": "Index"}, {"color": (.5, .5, .5)})
 
     worst, flats = 0.0, 0
-    for fe in ET.parse(p).iter("facet"):
+    for fe in gv._read_xml(p).iter("facet"):
         nx, ny = float(fe.get("nx")), float(fe.get("ny"))
         stored = float(fe.get("index_angle"))
         if math.hypot(nx, ny) < 1e-12:
@@ -720,7 +766,7 @@ def test_write_gcs_index_angle(tmp):
 
     # the eight facets of a ring sit 45 degrees apart on the gear
     ring = sorted(float(fe.get("index_angle"))
-                  for fe in ET.parse(p).iter("tier").__next__().findall("facet"))
+                  for fe in gv._read_xml(p).iter("tier").__next__().findall("facet"))
     gaps = {round(b - a, 6) for a, b in zip(ring, ring[1:])}
     check("index angle: a ring of eight is evenly spaced", gaps == {45.0}, gaps)
 
@@ -1832,6 +1878,7 @@ def main():
         test_parse_gcs_facet_cap(tmp)
         test_write_gcs_roundtrip(tmp)
         test_write_gcs_bytes(tmp)
+        test_write_gcs_cp1252(tmp)
         test_write_gcs_same_named_tiers(tmp)
         test_write_gcs_splits_cutting_steps(tmp)
         test_one_cut_survives_a_wobble(tmp)

@@ -7,6 +7,17 @@ executable whose frozen code does not match the committed source.
 
 ## 1.0.34
 
+- **`write_gcs()` writes cp1252, the code page Gem Cut Studio reads.** It
+  wrote UTF-8 with no declaration, and Gem Cut Studio read that as cp1252, so
+  every non-ASCII character came out wrong — most visibly the `·` that joins
+  a tier's instructions, two bytes in UTF-8, shown as `Â·`. 414 files written
+  this way were repaired by hand on 2026-11-04. Output is now cp1252 with LF
+  on every machine, still with no declaration; `·`, `à`, `ê` are one byte
+  each. A character cp1252 cannot hold (Greek, CJK, most Vietnamese letters
+  with a horn or a dot below) is written as an XML character reference such
+  as `&#937;`: well-formed, and read back exactly by this program, but not
+  yet checked in Gem Cut Studio. Anything that reads these files with a
+  strict UTF-8 XML parse must fall back to cp1252 the way `_read_xml` does.
 - **One tier per cutting step, on write and on screen.** A `.gcs` `<tier>`
   carries one `angle=` and one `depth=` for all of its facets, so a tier
   holding two cuts can only describe one of them. Gem Cut Studio draws the 3D

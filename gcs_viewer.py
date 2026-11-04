@@ -69,6 +69,11 @@ MAX_COORD = 1e4                         # |x|,|y|,|z| bound (matches the .gem re
 
 _XML_DECL = re.compile(r"^\s*<\?xml[^>]*\?>")
 
+# What write_gcs encodes a .gcs in: the Windows code page Gem Cut Studio
+# reads them in, with no declaration.  See the comment at the end of
+# write_gcs for why, and for what happens to a character it cannot hold.
+GCS_ENCODING = "cp1252"
+
 
 def _read_xml(path):
     """Parse a .gcs into an element tree, tolerating what really turns up.
@@ -625,17 +630,36 @@ def write_gcs(path, facets, info, material, gear=96):
     ET.SubElement(root, "info", title=title, author="", date="")
 
     ET.indent(root)
-    # Written through a file opened here rather than by handing ElementTree a
-    # path.  Given a path with encoding="unicode" it opens the file itself,
-    # in text mode with the machine's locale encoding: newlines come out CRLF
-    # on Windows and LF elsewhere, so the same stone converts to different
-    # bytes on different machines, and a title outside the local code page
-    # raises rather than being written.  The reader already falls back
-    # through the code pages for files other programs wrote (see _read_xml);
-    # what this program writes is simply UTF-8 with LF, everywhere.
-    with open(path, "w", encoding="utf-8", newline="\n") as fh:
-        ET.ElementTree(root).write(fh, encoding="unicode",
-                                   xml_declaration=False)
+    # Serialized to a str first and encoded here, rather than handing
+    # ElementTree a path.  Given a path it opens the file itself, in text
+    # mode with the machine's locale encoding: newlines come out CRLF on
+    # Windows and LF elsewhere, so the same stone converts to different bytes
+    # on different machines.  The bytes are built in full before the file is
+    # opened, so nothing can leave a half-written file behind.
+    #
+    # The encoding is cp1252 with LF, on every machine, and no XML
+    # declaration - which is what Gem Cut Studio reads.  It writes .gcs in
+    # the Windows code page without declaring one and reads them back the
+    # same way, so the UTF-8 this function used to write came out mangled
+    # there: the " · " that joins a tier's instructions is C2 B7 in UTF-8,
+    # and Gem Cut Studio showed it as "Â·" (414 files repaired by hand on
+    # 2026-11-04).  "Phan Thành Trung", "Fleur en rêve" and the middle dot
+    # are all single bytes in cp1252.
+    #
+    # A character cp1252 cannot hold (Greek, CJK, most Vietnamese letters
+    # with a horn or a dot below) is written as an XML character reference,
+    # "&#937;" for "Ω".  That is well-formed XML and round-trips exactly
+    # through parse_gcs; whether Gem Cut Studio expands it or shows the
+    # reference literally has not been checked.  Either way it costs no
+    # other character and no file fails to write over one letter of a title.
+    #
+    # Reading these back: _read_xml tries UTF-8 first and falls back to
+    # cp1252, and a non-ASCII cp1252 byte is almost never followed by the
+    # continuation bytes UTF-8 would need, so the fallback is what reads them.
+    text = ET.tostring(root, encoding="unicode", xml_declaration=False)
+    data = text.encode(GCS_ENCODING, errors="xmlcharrefreplace")
+    with open(path, "wb") as fh:
+        fh.write(data)
 
 
 # ----------------------------------------------------------------------------
