@@ -775,11 +775,16 @@ def test_write_gcs_index_angle(tmp):
 # 3. .gem parsing  (reverse-engineered binary)
 # ---------------------------------------------------------------------------
 
+# Two faces of one 4-fold cone - one angle (59.491) and one distance
+# (0.60921) at two index positions, which is what a GemCad tier IS.  The
+# fixture used to be two unrelated triangles that merely shared the name
+# "P1" (115.046 deg at depth 0, and 45.251 deg at -0.502); they passed while
+# a tier was a run of one NAME and are two tiers under the real rule.
 GEM_TIERS = [
     ("P1", "Cut to center point",
-     [(-1.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.0, 0.5, -1.07)]),
+     [(-0.7071, 0.7071, 0.0), (0.7071, 0.7071, 0.0), (0.0, 0.0, -1.2)]),
     ("P1", "Cut to center point",
-     [(1.0, 0.0, 0.0), (0.0, -1.0, 0.0), (0.0, 0.5, -1.07)]),
+     [(0.7071, 0.7071, 0.0), (0.7071, -0.7071, 0.0), (0.0, 0.0, -1.2)]),
     ("T", "Table",
      [(-0.5, -0.5, 0.5), (0.5, -0.5, 0.5), (0.5, 0.5, 0.5), (-0.5, 0.5, 0.5)]),
 ]
@@ -803,11 +808,13 @@ def test_parse_gem(tmp):
               for f, t in zip(facets, GEM_TIERS)),
           [len(f["verts"]) for f in facets])
 
-    # Y is mirrored on the way in; the encoder negated it, so it must return
+    # Y is mirrored on the way in; the encoder negated it, so it must return.
+    # Read off vertex 0, whose Y is non-zero - the cone's apex has Y = 0 and
+    # could not tell a mirror from an identity.
     v = np.asarray(facets[0]["verts"])
-    check("gem: Y un-mirrored on read", near(v[2][1], 0.5, 1e-12), v[2])
+    check("gem: Y un-mirrored on read", near(v[0][1], 0.7071, 1e-12), v[0])
     check("gem: X and Z untouched",
-          near(v[0][0], -1.0, 1e-12) and near(v[2][2], -1.07, 1e-12), v)
+          near(v[0][0], -0.7071, 1e-12) and near(v[2][2], -1.2, 1e-12), v)
 
     # this is the 2026-07-13 addition - before it, .gem had no title at all
     check("gem: title from trailing varint strings",
@@ -823,6 +830,51 @@ def test_parse_gem(tmp):
                for f in facets]
     check("gem: Newell normals oriented outward", all(o > 0 for o in outward),
           outward)
+
+
+def test_parse_gem_tier_from_the_cut(tmp):
+    """A tier's name may be written on any one of its records, and the rest
+    left blank.  Carrying the last name forward hands the blanks the PREVIOUS
+    tier's name, and then every tier after it drifts.
+
+    1210 Oval (design 1495, USFG 2006 SSC Masters): its 42.00 cut came out as
+    three facets labelled g5 and five labelled 6, and one tid held both 90.00
+    and 42.00 facets.  125 of the corpus .gem files drifted the same way."""
+    import numpy as _np
+
+    def cone(i, n, apex, name, instr=""):
+        t0, t1 = 2 * math.pi * (i - 0.5) / n, 2 * math.pi * (i + 0.5) / n
+        return (name, instr, [(math.sin(t0), math.cos(t0), 0.0),
+                              (math.sin(t1), math.cos(t1), 0.0),
+                              (0.0, 0.0, apex)])
+
+    # tier one: four faces, named on the THIRD record; tier two: named on its
+    # first.  Written the way GemCad writes them, blanks and all.
+    tiers = [cone(0, 4, -1.2, ""), cone(1, 4, -1.2, ""),
+             cone(2, 4, -1.2, "a"), cone(3, 4, -1.2, ""),
+             cone(0, 4, -0.7, "b"), cone(1, 4, -0.7, ""),
+             ("T", "Table", [(-0.4, -0.4, 0.5), (0.4, -0.4, 0.5),
+                             (0.4, 0.4, 0.5), (-0.4, 0.4, 0.5)])]
+    p = os.path.join(tmp, "drift.gem")
+    write_gem(p, tiers, title="Drift")
+    facets, info, _m = gv.parse_gem(p)
+
+    check("gem tiers: every facet of the cut gets the tier's name",
+          [f["tier"] for f in facets] == ["a"] * 4 + ["b"] * 2 + ["T"],
+          [f["tier"] for f in facets])
+    check("gem tiers: one tid per cut, not per name run",
+          [f["tid"] for f in facets] == [0] * 4 + [1] * 2 + [2],
+          [f["tid"] for f in facets])
+
+    # ...and no tid may hold two angles, which is how the drift showed up
+    bad = {}
+    for f in facets:
+        n = _np.asarray(f["normal"], float)
+        n = n / _np_norm(n)
+        a = round(math.degrees(math.acos(max(-1.0, min(1.0, abs(float(n[2])))))), 2)
+        bad.setdefault(f["tid"], set()).add(a)
+    check("gem tiers: no tid holds two angles",
+          all(len(v) == 1 for v in bad.values()), bad)
 
 
 def test_parse_gem_long_notes(tmp):
@@ -1884,6 +1936,7 @@ def main():
         test_one_cut_survives_a_wobble(tmp)
         test_write_gcs_index_angle(tmp)
         test_parse_gem(tmp)
+        test_parse_gem_tier_from_the_cut(tmp)
         test_parse_gem_long_notes(tmp)
         test_parse_gem_no_trailing(tmp)
         test_parse_gem_adversarial_tail(tmp)

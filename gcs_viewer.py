@@ -319,15 +319,18 @@ def parse_gem(path):
         raise ValueError("No facets found in .gem file.")
 
     pos = S
-    raw, prev = [], ""
+    raw = []
     while facet_at(pos):
         s = str_at(pos + 4)
         pos += 4                              # facet flag int32
         pos += 1 + B[pos]                     # the "name\tinstr" string
+        # Keep the name EXACTLY as the record gives it, blank included.
+        # Which tier a facet belongs to is decided below, from the cutting
+        # step; carrying the last name forward here is what made every tier
+        # hand its opening facets the previous tier's name.
         parts = s.split("\t", 1)
-        name = parts[0] or prev
+        name = parts[0]
         instr = parts[1] if len(parts) > 1 else ""
-        prev = name
         verts = []
         while pos + 28 <= len(B):
             if facet_at(pos):                 # next facet begins
@@ -363,7 +366,7 @@ def parse_gem(path):
             shift += 7
             if shift > 21:
                 return None, p
-        if L < 1 or L > 4000 or q + L > len(B):
+        if L < 0 or L > 4000 or q + L > len(B):
             return None, p
         ch = B[q:q + L]
         if not all(c in (9, 10, 13) or 32 <= c < 127 for c in ch):
@@ -372,41 +375,104 @@ def parse_gem(path):
     # The exact gap between the last vertex group and the strings varies, so
     # try every start offset and keep the chain that parses the most strings.
     def chain_at(p):
-        out = []
+        """The run of varint strings starting at p.
+
+        An EMPTY string does not end it - it is a blank field, and 1210 Oval
+        has one between its notes and its comment lines.  Stopping there
+        dropped "Width shall be 10mm", "Girdle shall be 0.3mm" and "Material
+        shall be CZ".  Two blanks in a row do end it: past the real strings
+        every zero byte would otherwise read as another empty one."""
+        out, blanks = [], 0
         while p < len(B) and len(out) < _GEM_MAX_TRAILING:
             s, p2 = varint_str(p)
             if s is None:
                 break
+            if not out and not s:
+                break           # a field chain opens with the title, never a blank
+            if s:
+                blanks = 0
+            else:
+                blanks += 1
+                if blanks > 1:
+                    break
             out.append(s); p = p2
+        while out and not out[-1]:
+            out.pop()
         return out
-    trailing = []
+    trailing, best = [], -1
+    chain_start = None
     for start in range(pos, min(len(B), pos + _GEM_TAIL_SCAN)):
         c = chain_at(start)
-        if len(c) > len(trailing):
-            trailing = c
+        # score on the strings that actually carry text: a chain of blanks
+        # is not a better read of the tail than a chain of real fields
+        score = sum(1 for t in c if t.strip())
+        if score > best:
+            trailing, best, chain_start = c, score, start
     info = {}
     if trailing:
         info["title"] = trailing[0].strip()
         if len(trailing) > 1:
             info["notes"] = " / ".join(t.strip() for t in trailing[1:] if t.strip())
 
+    # The tail carries the index gear and the refractive index immediately
+    # before the strings: int32 gear, then a double, then 20 bytes of other
+    # fields.  Both are read defensively - a value outside the range a gem is
+    # cut at is not an RI, and the caller's default stands.
+    ri = gear_n = None
+    if chain_start is not None and chain_start >= 24:
+        try:
+            v = _struct.unpack_from("<d", B, chain_start - 20)[0]
+            if math.isfinite(v) and 1.0 <= v <= 4.0:
+                ri = v
+            g = _struct.unpack_from("<i", B, chain_start - 24)[0]
+            if 8 <= g <= 1440:
+                gear_n = g
+        except Exception:
+            pass
+    if gear_n:
+        info["gear"] = float(gear_n)
+
     allv = np.array([v for _, _, vs in raw for v in vs]) * np.array([1.0, -1.0, 1.0])
     center = allv.mean(axis=0)
     facets = []
-    tid, prev_name = -1, None
+    built = []
     for name, instr, vs in raw:
-        if name != prev_name:
-            tid += 1
-            prev_name = name
         V = np.array(vs) * np.array([1.0, -1.0, 1.0])
         n = _newell(V)
         if np.dot(n, V.mean(axis=0) - center) < 0:
             n = -n
-        facets.append({"verts": V, "normal": n, "tier": name,
-                       "instr": instr, "tid": tid})
+        built.append({"verts": V, "normal": n, "tier": "", "instr": instr,
+                      "tid": 0, "_name": name})
+
+    # One GemCad tier per CUTTING STEP.  A tier is one angle and one distance
+    # cut at many index positions, so its facets share a plane setting and
+    # same_step() finds the boundary; grouping on the NAME instead put the
+    # boundary wherever the name happened to be written, which is not always
+    # the tier's first record.
+    runs, open_plane = [], None
+    for f in built:
+        plane = facet_plane(f)
+        if open_plane is None or not same_step(open_plane, plane):
+            runs.append([])
+            open_plane = plane
+        runs[-1].append(f)
+
+    # ...and the tier's name is whichever of its records carries one.  A tier
+    # whose records are all blank keeps the one before it, which is how a
+    # .gem writes a tier cut in two passes.
+    prev_name = ""
+    for tid, run in enumerate(runs):
+        name = next((f["_name"] for f in run if f["_name"]), "") or prev_name
+        prev_name = name
+        for f in run:
+            facets.append({"verts": f["verts"], "normal": f["normal"],
+                           "tier": name, "instr": f["instr"], "tid": tid})
 
     # .gem doesn't reliably store a display colour -> neutral pale stone
-    return facets, info, {"color": (0.82, 0.82, 0.86)}
+    material = {"color": (0.82, 0.82, 0.86)}
+    if ri is not None:
+        material["refractive_index"] = repr(ri)
+    return facets, info, material
 
 
 def load_design(path):
@@ -621,8 +687,20 @@ def write_gcs(path, facets, info, material, gear=96):
         i += run_len
 
     c = material.get("color", (0.82, 0.82, 0.86))
+    # The refractive index the design was cut for, when the source carried
+    # one.  A .gem stores it (parse_gem reads it off the tail) and a .gcs
+    # states it outright; writing the old hardcoded 1.76 over it put corundum
+    # on a stone cut for CZ at 2.16 - 1210 Oval, found 2026-11-09.  The 1.76
+    # stands only where there is nothing to carry through.
+    ri = "1.76"
+    try:
+        v = float(material.get("refractive_index", ri))
+        if 1.0 <= v <= 4.0:
+            ri = repr(v)
+    except (TypeError, ValueError):
+        pass
     rnd = ET.SubElement(root, "render", material="(converted from GemCad)",
-                        refractive_index="1.76", dispersion="0", clarity="95",
+                        refractive_index=ri, dispersion="0", clarity="95",
                         density="1", lighting_model="Random")
     ET.SubElement(rnd, "color", r=fmt(c[0]), g=fmt(c[1]), b=fmt(c[2]))
     title = (info.get("title") if info else None) or \
