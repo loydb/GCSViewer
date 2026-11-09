@@ -16,7 +16,12 @@ jobs:
       fail-fast: false
       matrix:
         os: [windows-latest, ubuntu-latest]
-        python: ["3.10", "3.12", "3.13"]
+        # 3.11 is the floor: Pillow 13, which is where the 12.3.0
+        # advisories are fixed, requires >= 3.11, and Python 3.10 went
+        # end of life on 2026-10-01.  3.11 is tested because it is the
+        # oldest version the project claims, not because anything is
+        # developed on it.
+        python: ["3.11", "3.12", "3.13"]
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7

@@ -174,6 +174,19 @@ executable whose frozen code does not match the committed source.
   computed with, and printing it in full reports float noise as though it were
   a measurement. A range whose ends round together prints as one number, and a
   value that is not a number at all is passed through as the file wrote it.
+- **Python 3.11 is the floor, and Pillow is on 13.** Pillow 12.3.0 carried 41
+  open advisories against this repository - 5 critical, among them heap
+  overflows in the JPEG and TIFF paths and an argument injection in the
+  Ghostscript call - and every one of them is first patched in 13.0.0, which
+  requires Python >= 3.11. The automated bump could not merge while the test
+  matrix still held 3.10, so `pip install` failed before a single test ran.
+  Python 3.10 reached end of life on 2026-10-01, so the matrix is now 3.11,
+  3.12 and 3.13 on Windows and Linux, `requirements.txt` pins Pillow 13.0.0
+  and numpy 2.4.6, and both suites pass on them - 279 and 53 checks under
+  3.11.9, the window suite included, which is the one that matters here
+  because the window hands its frames to Tk through `ImageTk.PhotoImage`.
+  numpy stays on the 2.4 series because 2.5 requires 3.12. Nothing in the
+  program itself changed.
 
 ## 1.0.33
 

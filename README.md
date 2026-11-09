@@ -212,8 +212,9 @@ the second lands beside the first as `stone_views (1).png`. A name you give
 explicitly is used as given.
 
 Those three libraries are the only dependencies — no matplotlib, no scipy.
-Developed on Python 3.12; CI runs the suite on 3.10, 3.12 and 3.13, on Windows
-and Linux.
+Developed on Python 3.12; CI runs the suite on 3.11, 3.12 and 3.13, on Windows
+and Linux. Python 3.11 is the floor — Pillow 13 requires it, and 3.10 went
+end of life on 2026-10-01.
 
 Set `GCS_VIEWER_NO_GUI=1` to make errors print to stderr instead of opening a
 message box, so an unattended script cannot stall on a dialog.
