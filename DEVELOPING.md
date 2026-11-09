@@ -134,8 +134,14 @@ nothing about the file is malformed and the 3D view of it is perfect:
   Studio draws the stone from the stored polygons and shows it correctly; its
   **sheet** re-cuts the stone from what the tiers say, and drops the rest.
   *Saw Tooth Marquise* printed "Total facets 27" for a 57-facet mesh.
-  `write_gcs` now ends a tier at a change of cutting step, and `tier_key()`
-  splits on it too so the files already written read correctly.
+  `write_gcs` now ends a tier at a change of cutting step, and
+  `tier_groups()` splits on it too, so the files already written read
+  correctly without being rewritten. A sixth defect, found in 2026-11
+  from a user report on *1210 Oval*, lived in the `.gem` reader: tier
+  labels drifted a cut behind the facets, and the header and footer
+  lines were dropped at the first unused slot. Both are covered by the
+  suite; `scripts/gem_slot_census.py` counts how often each slot is
+  used.
 
 ```bash
 python scripts/check_tier_steps.py "D:\designs" --recut

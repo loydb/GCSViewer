@@ -902,10 +902,10 @@ def render_view(facets, basis, scale, color, size=620, ss=2,
     light: optional unit vector overriding the global LIGHT -- pass an
     angled headlight (cam_dir tilted) so bottom/side views read as well
     as the top (Loyd validation feedback 2026-07-14).
-    palette: optional {tier_key: (r,g,b)} from tier_palette(), which
+    palette: optional {tier key: (r,g,b)} from tier_palette(), which
     colours each facet by its tier instead of by the material and takes
     precedence over both `color` and `gray`.
-    names: optional {tier_key: label} from tier_labels(); without it a
+    names: optional {tier key: label} from tier_labels(); without it a
     facet is captioned with whatever the file called its tier."""
     right, up, forward, cam_dir = basis
     base_col = np.array((0.82, 0.82, 0.82) if gray else color, dtype=float)
@@ -1052,7 +1052,7 @@ def tier_keys(facets):
 
 
 def tier_palette(facets, sat=0.34, val=1.0):
-    """A distinct pastel colour per tier: {tier_key: (r, g, b) in 0..1}.
+    """A distinct pastel colour per tier: {tier key: (r, g, b) in 0..1}.
 
     For reading the cutting order off the stone rather than judging its
     material colour - which tier is that facet, and did the tier I just cut
@@ -1234,7 +1234,7 @@ def tier_groups(facets):
 
 
 def tier_labels(facets):
-    """{tier_key: label} in the faceter's convention - P1, P2… on the
+    """{tier key: label} in the faceter's convention - P1, P2… on the
     pavilion, G1, G2… on the girdle, C1, C2… on the crown, T for the table -
     numbered in cutting order.
 
@@ -1302,7 +1302,7 @@ def tier_table(facets, gear=96.0):
         # step, so a tier holding two steps held two lines - "Match g1,
         # establish upper girdle line" and then "Meet g1.a.a.g1" both lived
         # in tier a of Alcyone - and reading the first facet alone dropped
-        # the second.  Since tier_key() splits on the step those are two
+        # the second.  Since tier_groups() splits on the step those are two
         # rows now, one line each: across 1,700 .gem files, 1,036 held a
         # tier carrying more than one instruction under the old boundary and
         # none do under this one.  What remains is the .gcs shape, one

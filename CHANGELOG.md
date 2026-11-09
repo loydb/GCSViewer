@@ -45,6 +45,41 @@ executable whose frozen code does not match the committed source.
   this one, none do — each step is its own tier with its own line. The
   joining stays for what it was always for: a `.gcs` repeats one instruction
   on every facet of a tier, and that has to collapse to a single line.
+- **A `.gem`'s tier labels no longer drift out of step with its facets.**
+  The label belongs to the facet that *begins* a cutting step, and the reader
+  carried the last one seen forward across step boundaries, so from the first
+  step whose opening facet was unlabelled every later tier wore the previous
+  tier's name. *1210 Oval* printed its pavilion tiers one cut late. Each
+  tier's name now comes from the group the cutting step defines - the first
+  non-blank label among its own facets - and falls back to the tier before it
+  only when the whole group is unlabelled, which is what a GemCad file does
+  when it repeats a setting.
+- **A `.gem`'s header and footer lines survive the trip into a `.gcs`.** Its
+  trailing strings are eight fixed slots - `title`, `header1`-`header3`,
+  `footer1`-`footer4` - and an unused one is an *empty* string rather than a
+  missing one. Reading the chain until the first blank therefore stopped at
+  the first unused slot and dropped everything below it: *1210 Oval* arrived
+  with no author and none of its comments, and counting blanks instead lost
+  them again on a design with two unused header slots in a row. The reader
+  now walks all eight and allows a blank anywhere but the first, and
+  `write_gcs` writes each non-empty one into the `<info>` field of the same
+  name. Over the 1,703 `.gem` files on this machine the later slots are far
+  from rare: `header1` 1,416, `header2` 490, `header3` 150, `footer1` 1,272,
+  `footer2` 808, `footer3` 719, `footer4` 608 - counted by
+  `scripts/gem_slot_census.py`.
+- Which `<info>` field each slot belongs in was settled by **importing four
+  `.gem` files in Gem Cut Studio and reading back the `.gcs` it saved**, not
+  by guessing: no file states the mapping, and the four differ in exactly the
+  way that matters (one subtitle is a credit, one a date, one a competition,
+  one an attribution, and they leave different slots blank). For all four
+  GemCut writes **no `author=` and no `date=` attribute at all** - not even
+  for the one whose subtitle reads "by Jeff Ford 2005", nor the one whose
+  *title* reads "Different Look by Wayne Emery" - so `write_gcs` leaves both
+  empty rather than mining a designer out of free text. Only 601 of the 1,416
+  subtitles even begin with "by".
+- The refractive index is read from the `.gem` as well, from the double that
+  sits ahead of the string chain, so a stone saved at RI 2.16 no longer opens
+  as the 1.76 default.
 - **A cutting step is recognised by a tolerance, not by a grid**, because a
   grid has boundaries and the facets of one cut routinely sit a few millionths
   apart. *PC 21.113 Bravo Alternate Pavilion* cuts sixteen facets in one

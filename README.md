@@ -110,9 +110,11 @@ a facet the tool consumed leaves a visible hole rather than a plausible stone.
 | **`.gcs`** | Gemcut Studio XML. Facets, tiers, instructions, material colour. |
 | **`.gem`** | GemCad binary — **reverse-engineered**, no published spec. |
 
-The `.gem` reader recovers the title and the designer's notes from a trailing
-block of length-prefixed strings, and prints them along the foot of the sheet,
-since that is often all a `.gem` says about itself. Face normals are recomputed
+The `.gem` reader recovers the title, three header lines and four footer
+lines from a trailing block of length-prefixed strings - eight fixed slots,
+an unused one being empty rather than absent - and prints them along the
+foot of the sheet, since that is often all a `.gem` says about itself. It
+also recovers the refractive index and the index gear from the same tail. Face normals are recomputed
 with Newell's method, because the stored ones cannot be relied on.
 
 There is no `.asc` support, by design.
