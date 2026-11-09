@@ -72,8 +72,14 @@ MUTATIONS = [
      '        name = labels.get(key, "")',
      '        name = str(grp[0].get("tier", "") or "")'),
     ("skip the trailing strings in .gem (the 2026-07-13 title/notes work)",
-     'info["title"] = trailing[0].strip()',
-     'info["title"] = ""'),
+     "        for slot, text in zip(GEM_SLOTS, trailing):",
+     "        for slot, text in zip(GEM_SLOTS, []):"),
+    ("read the .gem's trailing strings only as far as the first blank, "
+     "losing the comment lines again",
+     "            if not out and not s:\n"
+     "                break",
+     "            if not s:\n"
+     "                break"),
     ("write only the opening instruction of a tier, losing the rest",
      "                if text and text not in steps:\n"
      "                    steps.append(text)",
