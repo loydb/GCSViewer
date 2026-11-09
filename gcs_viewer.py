@@ -267,6 +267,13 @@ def _newell(V):
     return n / ln if ln > 1e-12 else np.array([0.0, 0.0, 1.0])
 
 
+# What the .gem's trailing strings are, in order.  Gem Cut Studio's own
+# import of four of them writes exactly these <info> fields and leaves author
+# and date empty, even where the subtitle is a plain credit (2026-11-09).
+GEM_SLOTS = ("title", "header1", "header2", "header3",
+             "footer1", "footer2", "footer3", "footer4")
+
+
 def parse_gem(path):
     size = os.path.getsize(path)
     if size > MAX_FILE_BYTES:
@@ -377,27 +384,24 @@ def parse_gem(path):
     def chain_at(p):
         """The run of varint strings starting at p.
 
-        An EMPTY string does not end it - it is a blank field, and 1210 Oval
-        has one between its notes and its comment lines.  Stopping there
-        dropped "Width shall be 10mm", "Girdle shall be 0.3mm" and "Material
-        shall be CZ".  Two blanks in a row do end it: past the real strings
-        every zero byte would otherwise read as another empty one."""
-        out, blanks = [], 0
-        while p < len(B) and len(out) < _GEM_MAX_TRAILING:
+        These are FIXED SLOTS, not a list - GEM_SLOTS names them - and an
+        unused slot is an EMPTY string.  So a blank does not end the chain:
+        1210 Oval has one between its headers and its footers, and Different
+        Look has two in a row.  Reading only as far as the first blank
+        dropped the comment lines, and counting blanks dropped them again on
+        the second design.  The chain simply runs to the end of the slots.
+
+        It may not OPEN on a blank: past the real strings every zero byte
+        reads as another empty one, and such a chain would score as well as
+        the real one while starting earlier, taking the title with it."""
+        out = []
+        while p < len(B) and len(out) < len(GEM_SLOTS):
             s, p2 = varint_str(p)
             if s is None:
                 break
             if not out and not s:
-                break           # a field chain opens with the title, never a blank
-            if s:
-                blanks = 0
-            else:
-                blanks += 1
-                if blanks > 1:
-                    break
+                break
             out.append(s); p = p2
-        while out and not out[-1]:
-            out.pop()
         return out
     trailing, best = [], -1
     chain_start = None
@@ -410,9 +414,15 @@ def parse_gem(path):
             trailing, best, chain_start = c, score, start
     info = {}
     if trailing:
-        info["title"] = trailing[0].strip()
-        if len(trailing) > 1:
-            info["notes"] = " / ".join(t.strip() for t in trailing[1:] if t.strip())
+        for slot, text in zip(GEM_SLOTS, trailing):
+            text = text.strip()
+            if text:
+                info[slot] = text
+        # the lines as one string, for the sheet footer and anything else
+        # that wants them without caring which slot they came from
+        lines = [t.strip() for t in trailing[1:] if t.strip()]
+        if lines:
+            info["notes"] = " / ".join(lines)
 
     # The tail carries the index gear and the refractive index immediately
     # before the strings: int32 gear, then a double, then 20 bytes of other
@@ -705,7 +715,17 @@ def write_gcs(path, facets, info, material, gear=96):
     ET.SubElement(rnd, "color", r=fmt(c[0]), g=fmt(c[1]), b=fmt(c[2]))
     title = (info.get("title") if info else None) or \
         os.path.splitext(os.path.basename(path))[0]
-    ET.SubElement(root, "info", title=title, author="", date="")
+    attrs = {"title": title, "author": "", "date": ""}
+    # The header and footer lines, in the slots Gem Cut Studio puts them in
+    # when IT imports the .gem.  author and date stay empty because GemCut
+    # leaves them empty - a .gem's subtitle is free text ("April 2019",
+    # "2008 USFG Single Stone Competition", "from Paul C. Smith Sirus"), not
+    # a designer, and only 58 of 447 even begin with "by".
+    for slot in GEM_SLOTS[1:]:
+        text = (info.get(slot) or "").strip() if info else ""
+        if text:
+            attrs[slot] = text
+    ET.SubElement(root, "info", **attrs)
 
     ET.indent(root)
     # Serialized to a str first and encoded here, rather than handing

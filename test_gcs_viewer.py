@@ -877,6 +877,63 @@ def test_parse_gem_tier_from_the_cut(tmp):
           all(len(v) == 1 for v in bad.values()), bad)
 
 
+def test_gem_header_footer_slots(tmp):
+    """The .gem's trailing strings are eight fixed slots, and an unused one
+    is EMPTY:
+
+        title | header1 header2 header3 | footer1 footer2 footer3 footer4
+
+    Established 2026-11-09 by importing four .gem files in Gem Cut Studio and
+    reading the .gcs it saved.  A reader that stopped at the first blank lost
+    the comment lines (1210 Oval has a blank header3), and one that stopped
+    after two blanks lost them again (Different Look has header2 AND header3
+    empty).  Corpus fill: header1 x447, header2 x117, header3 x38,
+    footer1 x434, footer2 x170, footer3 x128, footer4 x33.
+
+    Gem Cut Studio leaves <info author> and <info date> EMPTY on import, even
+    where the subtitle is a plain credit ("by Jeff Ford 2005"), so write_gcs
+    does too - a .gem subtitle is free text, not a designer."""
+    import xml.etree.ElementTree as ET
+
+    faces = [("P1", "Cut", [(-0.7071, 0.7071, 0.0), (0.7071, 0.7071, 0.0),
+                            (0.0, 0.0, -1.2)]),
+             ("P1", "Cut", [(0.7071, 0.7071, 0.0), (0.7071, -0.7071, 0.0),
+                            (0.0, 0.0, -1.2)])]
+    # header2 and header3 blank, footer2 blank - the shape that broke both
+    # earlier readings
+    p = os.path.join(tmp, "slots.gem")
+    write_gem(p, faces, title="Slotted",
+              notes=["by Somebody 1999", "", "", "Width shall be 10mm", "",
+                     "Material shall be CZ"])
+    _facets, info, _mat = gv.parse_gem(p)
+
+    check("slots: the title is the first slot",
+          info.get("title") == "Slotted", info.get("title"))
+    check("slots: subtitle lands in header1",
+          info.get("header1") == "by Somebody 1999", info.get("header1"))
+    check("slots: an empty slot is not filled",
+          not info.get("header2") and not info.get("header3"),
+          (info.get("header2"), info.get("header3")))
+    check("slots: a comment past TWO blanks still arrives",
+          info.get("footer1") == "Width shall be 10mm", info.get("footer1"))
+    check("slots: and so does one past a third",
+          info.get("footer3") == "Material shall be CZ", info.get("footer3"))
+
+    q = os.path.join(tmp, "slots.gcs")
+    gv.write_gcs(q, _facets, info, _mat)
+    el = ET.parse(q).getroot().find("info")
+    check("slots: written into the same fields Gem Cut Studio uses",
+          el.get("header1") == "by Somebody 1999"
+          and el.get("footer1") == "Width shall be 10mm"
+          and el.get("footer3") == "Material shall be CZ", el.attrib)
+    check("slots: author and date stay empty, as GemCut leaves them",
+          el.get("author") == "" and el.get("date") == "",
+          (el.get("author"), el.get("date")))
+    check("slots: an unused slot is not written at all",
+          "header2" not in el.attrib and "footer2" not in el.attrib,
+          sorted(el.attrib))
+
+
 def test_parse_gem_long_notes(tmp):
     """Notes over 127 chars need the multi-byte varint length, which is why
     the trailing-string reader is not the same code as the facet reader.
@@ -1937,6 +1994,7 @@ def main():
         test_write_gcs_index_angle(tmp)
         test_parse_gem(tmp)
         test_parse_gem_tier_from_the_cut(tmp)
+        test_gem_header_footer_slots(tmp)
         test_parse_gem_long_notes(tmp)
         test_parse_gem_no_trailing(tmp)
         test_parse_gem_adversarial_tail(tmp)
