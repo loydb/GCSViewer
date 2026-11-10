@@ -146,6 +146,13 @@ MUTATIONS = [
     ("bind grayscale to the wrong key",
      'self.root.bind("g", lambda e: self._toggle("gray"))',
      'self.root.bind("G", lambda e: self._toggle("gray"))'),
+    ("soften the tint stipple back to the material theme's dot, which "
+     "disappears into a pale flat pastel",
+     "FROST_DOT_TINT = 0.56",
+     "FROST_DOT_TINT = 0.70"),
+    ("paint a frosted facet like any other one in tier-colour mode",
+     "                rgb = rgb * (1.0 - FROST_BLOOM) + FROST_BLOOM",
+     "                rgb = rgb * 1.0"),
 ]
 
 # labels above that only the windowed suite can catch

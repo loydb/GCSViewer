@@ -782,6 +782,12 @@ SHININESS = 26.0
 # stone, including the facets turned away from the light.
 TINT_AMBIENT = 0.62
 TINT_DIFFUSE = 0.38
+# A frosted facet in tier-colour mode: its own hue, bloomed toward white the
+# way ground glass goes milky, and a firmer stipple than the material theme
+# needs.  The tint is pale and flat by design, so the material theme's 30%
+# dot disappears into it; 44% is still a texture rather than a pattern.
+FROST_BLOOM = 0.26
+FROST_DOT_TINT = 0.56
 
 
 _DOT_CACHE = {}     # (w, h, ss) -> L-mode dot-lattice mask
@@ -810,13 +816,15 @@ def _dot_lattice(w, h, ss):
     return lat
 
 
-def _stipple(img, d, pts, rgb, ss):
+def _stipple(img, d, pts, rgb, ss, light_k=0.70):
     """Overlay a fine dot lattice on a frosted facet, clipped to its polygon.
 
     The dots ride the facet's own shade - darker dots on a light facet,
     lighter on a dark one - so the texture stays visible in both the color
     and gray themes without hiding the facet edges (the outline is drawn by
-    the caller, before this).
+    the caller, before this).  light_k sets how far a dot on a LIGHT facet is
+    darkened: tier-colour mode asks for a firmer one, because its facets are
+    pale and flat and the material theme's dot vanishes into them.
     """
     xs = [p[0] for p in pts]
     ys = [p[1] for p in pts]
@@ -838,7 +846,7 @@ def _stipple(img, d, pts, rgb, ss):
     lat = _dot_lattice(img.width, img.height, ss).crop((x0, y0, x1, y1))
     mask = ImageChops.multiply(mask, lat)
     lum = 0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]
-    k = 0.70 if lum > 92 else 1.55
+    k = light_k if lum > 92 else 1.55
     dot = tuple(int(np.clip(c * k + (12 if k > 1 else 0), 0, 255))
                 for c in rgb)
     img.paste(dot, (x0, y0), mask)
@@ -960,6 +968,13 @@ def render_view(facets, basis, scale, color, size=620, ss=2,
             # darkens a facing-away facet until two tiers are one colour.
             # Enough shading remains to keep the facets apart as shapes.
             rgb = col * (TINT_AMBIENT + TINT_DIFFUSE * lam)
+            if frosted:
+                # Keep the hue - it is what names the tier - but bloom it
+                # toward white.  Lifting rather than darkening is both what
+                # frost looks like and what keeps the stipple readable: the
+                # dots are drawn darker than their facet, and there is more
+                # room below a bloomed pastel than above it.
+                rgb = rgb * (1.0 - FROST_BLOOM) + FROST_BLOOM
         elif frosted:
             # matte: no specular highlight, softened diffuse - a frosted
             # facet scatters instead of reflecting
@@ -1002,7 +1017,8 @@ def render_view(facets, basis, scale, color, size=620, ss=2,
         d.polygon(pts, fill=rgb,
                   outline=tuple(max(0, c - 70) for c in rgb), width=edge)
         if frosted:
-            _stipple(img, d, pts, rgb, ss)
+            _stipple(img, d, pts, rgb, ss,
+                     light_k=FROST_DOT_TINT if palette is not None else 0.70)
         if labels and tier:
             area = _poly_area(px, py)
             if tier not in best or area > best[tier][0]:

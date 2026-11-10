@@ -99,7 +99,10 @@ on the material colours for `--save` unless you ask with `--tier-colors`.
 
 **Frosted facets** — the matte bands an edge-frosting tool leaves — draw
 without the highlight and under a fine stipple, so they are distinguishable
-from polished facets at a glance in both the colour and grayscale themes.
+from polished facets at a glance in all three themes. Under tier colours,
+where every facet of a tier is one flat pastel, a frosted one keeps its
+tier's hue but blooms toward white and takes a firmer stipple — the tint is
+pale and flat by design, and the material theme's dot disappears into it.
 Their edges stay drawn, which is the point of looking at a frosted design:
 a facet the tool consumed leaves a visible hole rather than a plausible stone.
 

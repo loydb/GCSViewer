@@ -1500,6 +1500,52 @@ def test_frosting(tmp):
     check("frosting: gray theme still distinguishes it",
           area > 200 and peak >= 25, (area, peak))
 
+    # The theme this test used to skip, and the one it mattered in.  Tier
+    # colour painted every facet of a tier the same flat pastel whatever its
+    # finish: the matte branch is an `elif`, so a tinted facet never reached
+    # it, and the stipple was the only cue left - fine dots 30% darker on a
+    # pale, deliberately flat colour.  Loyd, 2026-11-09, on Pentagram
+    # Garnet (C3 and C4 frosted): "make the frosted facets visually
+    # distinct from the non-frosted ones".
+    pal_p = gv.tier_palette(polished)
+    pal_f = gv.tier_palette(frosted)
+    check("frosting: the tier colour itself does not depend on the finish",
+          list(pal_p.values()) == list(pal_f.values()),
+          (list(pal_p.values()), list(pal_f.values())))
+    area, peak = _difference(
+        gv.render_view(polished, basis, scale, (0.2, 0.55, 0.9),
+                       size=160, ss=2, labels=False, palette=pal_p),
+        gv.render_view(frosted, basis, scale, (0.2, 0.55, 0.9),
+                       size=160, ss=2, labels=False, palette=pal_f))
+    check("frosting: tier-colour mode distinguishes it too",
+          area > 200 and peak >= 25, (area, peak))
+
+    # and the cue is the bloom as well as the dots, so it survives a facet
+    # too small to show much texture
+    import gcs_viewer as _gv
+    saved = _gv.FROST_BLOOM
+    try:
+        # ONE thing changes: the bloom.  An earlier version of this check
+        # also put FROST_DOT_TINT back to the material theme's 0.70, so what
+        # it actually measured was the firmer dot - and a mutation deleting
+        # the bloom survived it.
+        _gv.FROST_BLOOM = 0.0
+        dots_only = _difference(
+            gv.render_view(polished, basis, scale, (0.2, 0.55, 0.9),
+                           size=160, ss=2, labels=False, palette=pal_p),
+            gv.render_view(frosted, basis, scale, (0.2, 0.55, 0.9),
+                           size=160, ss=2, labels=False, palette=pal_f))
+    finally:
+        _gv.FROST_BLOOM = saved
+    # by AREA, not peak: the dots are the largest single difference either
+    # way and the bloom lifts them with the facet, so the peak can even fall
+    # a little.  What the bloom buys is that EVERY pixel of the facet differs
+    # from the polished render, not only the dotted ones.
+    check("frosting: the bloom spreads the cue past the dots",
+          area > 1.3 * dots_only[0], (area, dots_only[0]))
+    check("frosting: the tint theme asks for a firmer dot than the material one",
+          gv.FROST_DOT_TINT < 0.70, gv.FROST_DOT_TINT)
+
 
 def test_tier_colors():
     """The tier-colour mode paints each tier its own colour so the cutting

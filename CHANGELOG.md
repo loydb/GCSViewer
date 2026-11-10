@@ -187,6 +187,21 @@ executable whose frozen code does not match the committed source.
   because the window hands its frames to Tk through `ImageTk.PhotoImage`.
   numpy stays on the 2.4 series because 2.5 requires 3.12. Nothing in the
   program itself changed.
+- **A frosted facet reads as frosted under tier colours too.** It always
+  had two cues in the material theme — no highlight, and a fine stipple —
+  but the tint branch is taken before the matte one, so under tier colours
+  a frosted facet was shaded exactly like a polished one and the dots were
+  all that remained: 30% darker, on a pastel that is pale and flat by
+  design. On *Pentagram Garnet*, whose C3 and C4 are the frosted tiers, that
+  was easy to miss. A tinted frosted facet now keeps its tier's hue — the
+  hue is what names the tier — and blooms toward white the way ground glass
+  goes milky, under a firmer stipple. Measured against the polished render
+  of the same stone from directly above: 2,389 pixels moved and a peak
+  difference of 93 before, 7,491 and 136 after. The test suite had checked
+  the material theme and the gray theme and stopped there, which is why the
+  one mode where the matte shading never applied was the one mode nobody
+  measured; it now checks all three, and that the tier's colour itself does
+  not depend on the finish.
 
 ## 1.0.33
 
