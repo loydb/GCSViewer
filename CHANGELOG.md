@@ -202,6 +202,87 @@ executable whose frozen code does not match the committed source.
   one mode where the matte shading never applied was the one mode nobody
   measured; it now checks all three, and that the tier's colour itself does
   not depend on the finish.
+- **The website's ten tier-colour sets, in the viewer** (Loyd,
+  2026-11-13: "add these same palettes to the viewer app, and for the most
+  recent choice of color palette to be sticky between runs"; "There needs to
+  be a dropdown at top right to choose the color palette"). A dropdown at the
+  TOP RIGHT of the window, above the stone, offers two sets for normal
+  vision — *None (Pastel)*, which is this viewer's own golden-angle palette,
+  its first 16 colours, and *None (Vibrant)*, the website's default — and one
+  for each of eight kinds of colour blindness. Achromatopsia and blue cone
+  monochromacy draw the stone **unshaded**: lightness is all those viewers
+  have to tell one tier from another, and the ordinary tint shading would
+  spend it.
+- **Above the stone and hard right**, not below it with the toggles. This is
+  the control a user reaches for FIRST — before reading anything, they pick
+  the set that matches their own sight — and a chooser found only after the
+  reading has already failed the person it exists for. The window checks now
+  assert the placement, asked of the geometry manager rather than of screen
+  pixels, because the window under test is never mapped.
+- The button face carries the SHORT name of the set that is on
+  (*Deuteranopia*), the menu the full one with its plain-English gloss
+  (*Deuteranopia (Green-blind)*), since the menu is where the choice is made
+  and the button only has to say which one is live. The two normal-vision
+  sets keep their parenthetical, being told apart by nothing else. The
+  button is a fixed width, so picking a set does not shift the control
+  sideways — at 74 characters the longest full label would have made it
+  wider than the three render panels it sits over.
+- **`scripts/stage_viewer_work.py` and `scripts/check_commit.py`**, after
+  this feature was committed, built and installed with its whole window half
+  missing. The viewer's working tree carries a parked raytracer that must not
+  ride along into a commit, and the temp-folder helper that held it back
+  worked by REVERSING every diff hunk that mentioned `render_button`,
+  `self.material` or `open_render_window`. The colour-set menu was written
+  into `ViewerApp.__init__` and `_load_data` — the very hunks those names
+  live in — so it went back with them. The commit kept the ten sets as data
+  and no way to choose one; `--palettes` answered, an exe built from it
+  answered too, and both suites passed — against the WORKING TREE, which had
+  the whole thing. The staging helper now removes NAMED, EXACT pieces and
+  refuses to stage at all unless every landmark of the feature survives, and
+  `check_commit.py` runs both suites against a throwaway worktree of the
+  commit itself, which is the only run that says anything about what was
+  committed.
+- `scripts/mutation_check.py` now copies the generated `tier_sets_data.py`
+  into the sandbox it mutates in. Without it the import failed and the
+  BASELINE run died, which the harness reports as "the unmutated suite
+  already fails" — a missing file wearing the face of a broken program.
+- **The colours are assigned, not handed out in tier order.** Tier 1 taking
+  colour 1 puts near-alike colours on neighbours, which is exactly what
+  these sets exist to prevent. Tiers that TOUCH — sharing a facet edge, a
+  shared corner not counting, which is the map-colouring convention — are
+  kept at least 10 CIEDE2000 apart *as that viewer sees them*; among the
+  colours that qualify a tier takes the least-used one, so a design still
+  shows variety rather than the fewest colours that would do. Ports
+  `tier_assign.assign` and `tier_adjacency.graph` from the research. Checked
+  against the research's own code over 200 designs of the pattern
+  collection: of the 137 whose tier count the two agree on, **all 137 got
+  the same colours from all ten sets**. The other 63 are files where one
+  `<tier>` element holds more than one cutting step, which the viewer splits
+  and the research's XML reader does not — nothing to compare, not a
+  disagreement.
+- **The set is remembered between runs**, in `prefs.json` under the user's
+  own config directory (`%APPDATA%\GCSViewer` on Windows), written the
+  moment it is picked rather than at exit, because the window is usually
+  closed with Esc and a preference that only survives a graceful shutdown is
+  one that goes missing. Every failure to read or write it is silent and
+  falls back to the default: a viewer that will not open because a
+  preferences file was hand-edited into invalid JSON is worse than one that
+  forgets what you picked.
+- `--palette=ID` picks a set for one run, `--palettes` lists them. A
+  command-line `--save` takes the default unless `--palette=` says
+  otherwise - never the remembered choice - so a sheet rendered by a script
+  cannot change because of something clicked in the window last week. The
+  **S** key inside the window saves what the window is showing, as it always
+  has.
+- No colour is typed by hand: `scripts/gen_tier_sets.py` generates
+  `tier_sets_data.py` from the research's `palettes.json`, the same source
+  the website's `tierSetsData.ts` is generated from, and the two files were
+  checked to agree on every colour and every distance. The distance tables
+  are generated rather than computed at runtime so the viewer still needs
+  nothing but numpy and Pillow - the simulation behind them is scikit-image's.
+- `tier_palette(facets)` without a set is unchanged, so every caller written
+  before this - the demo animation, the solver scripts - draws exactly what
+  it always drew.
 
 ## 1.0.33
 

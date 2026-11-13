@@ -153,6 +153,52 @@ MUTATIONS = [
     ("paint a frosted facet like any other one in tier-colour mode",
      "                rgb = rgb * (1.0 - FROST_BLOOM) + FROST_BLOOM",
      "                rgb = rgb * 1.0"),
+    ("hand a set's colours out in tier order instead of assigning them, "
+     "which is what puts near-alike colours on neighbours",
+     "    color, short = assign_tier_colors(len(order), adj, spec[\"seenD\"])",
+     "    color, short = {i: i % len(spec[\"colors\"]) "
+     "for i in range(len(order))}, False"),
+    ("count a shared CORNER as a shared border, so tiers meeting at a point "
+     "are forced apart",
+     "            edges.setdefault((a, b) if a < b else (b, a), "
+     "set()).add(index[k])",
+     "            edges.setdefault(a, set()).add(index[k])"),
+    ("shift every tier one colour along after the assignment decided",
+     "    return ({k: hex_rgb(cols[color.get(i, 0)]) "
+     "for i, k in enumerate(order)},",
+     "    return ({k: hex_rgb(cols[(color.get(i, 0) + i) % len(cols)]) "
+     "for i, k in enumerate(order)},"),
+    ("shade the monochromacy sets like any other set, spending the lightness "
+     "that is the only cue those viewers have",
+     "            rgb = col if flat else col * (TINT_AMBIENT + "
+     "TINT_DIFFUSE * lam)",
+     "            rgb = col * (TINT_AMBIENT + TINT_DIFFUSE * lam)"),
+    ("open on the default colour set, ignoring the one last picked",
+     '    want = load_prefs().get("tier_set")',
+     "    want = None"),
+    ("let a damaged preferences file reach the caller instead of reading "
+     "as nothing",
+     "        return got if isinstance(got, dict) else {}\n"
+     "    except Exception:\n"
+     "        return {}",
+     "        return got if isinstance(got, dict) else {}\n"
+     "    except Exception:\n"
+     "        raise"),
+    ("never write the colour set down, so it is forgotten between runs",
+     "        save_prefs(tier_set=self.tier_set_id)",
+     "        pass"),
+    ("put the colour-set chooser BELOW the stone, where it is found only "
+     "after the reading it should have come before",
+     '        topbar.pack(fill="x", padx=PANEL_PAD + 4, pady=(6, 0))',
+     '        topbar.pack(side="bottom", fill="x", padx=PANEL_PAD + 4, '
+     'pady=(6, 0))'),
+    ("leave the chooser at the LEFT edge of the top bar",
+     '        self.tier_menu.pack(side="right")',
+     '        self.tier_menu.pack(side="left")'),
+    ("put the full label on the button face, so the control changes width "
+     "every time the set changes",
+     '    return brief if cut == "None" else cut',
+     "    return label"),
 ]
 
 # labels above that only the windowed suite can catch
@@ -162,6 +208,10 @@ GUI_ONLY = {
     "let the 3/4 view tilt past vertical",
     "leave the right arrow key unbound",
     "bind grayscale to the wrong key",
+    "never write the colour set down, so it is forgotten between runs",
+    "put the colour-set chooser BELOW the stone, where it is found only "
+    "after the reading it should have come before",
+    "leave the chooser at the LEFT edge of the top bar",
 }
 
 # labels that only a platform whose native line ending is not LF can catch:
@@ -209,6 +259,14 @@ def main():
     for suite in ("test_gcs_viewer.py", "test_gui.py"):
         if os.path.exists(os.path.join(HERE, suite)):
             shutil.copy2(os.path.join(HERE, suite), tmp)
+    # the ten colour sets live in a GENERATED module beside the viewer, not
+    # inside it.  It is data, not program, so it is copied rather than
+    # mutated - but without it the import fails and the baseline run dies,
+    # which reads as "the suite already fails" instead of "a file is missing".
+    for data in ("tier_sets_data.py",):
+        d = os.path.join(HERE, data)
+        if os.path.exists(d):
+            shutil.copy2(d, tmp)
     # the suite also imports build_exe, to check that an install goes to the
     # copy Windows actually launches.  It is not mutated - it is not part of
     # the program - but without it here the baseline run fails to import and

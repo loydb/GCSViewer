@@ -58,8 +58,8 @@ drift from what the program produces.
 ## Tests
 
 ```bash
-python test_gcs_viewer.py     # 234 checks
-python test_gui.py            # 51 checks, the window itself
+python test_gcs_viewer.py     # 403 checks
+python test_gui.py            # 69 checks, the window itself
 ```
 
 No fixtures on disk and no third-party design files: every stone is
@@ -72,12 +72,31 @@ than calling `mainloop()`, and presses the actual keys through Tk's event
 dispatch. It skips where Tk has no display, so headless runners stay green.
 
 ```bash
-python scripts/mutation_check.py
+python scripts/mutation_check.py          # every mutation; opens windows
+python scripts/gen_tier_sets.py --check   # the colour sets match the research
+python scripts/check_tier_sets.py "D:\designs" --limit 200
 ```
 
-Reintroduces twenty-seven deliberate defects one at a time — dropping the `.gem`
-Y mirror, painting nearest-first, ignoring the gear — and reports which checks
-catch each. Currently **27 of 27**. Its first run found three that survived,
+The last two need the tier-colour research tree on the machine.
+`gen_tier_sets.py` regenerates `tier_sets_data.py` from its `palettes.json`,
+and `--check` fails if the committed copy has drifted from it;
+`check_tier_sets.py` runs the research's own adjacency and assignment beside
+the viewer's port over real designs and compares, tier for tier.
+
+Reintroduces deliberate defects one at a time — dropping the `.gem` Y mirror,
+painting nearest-first, ignoring the gear, handing a colour set out in tier
+order instead of assigning it, putting the colour-set chooser below the stone
+— and reports which checks catch each. **48 mutations**; the last FULL sweep
+was green at 36. The twelve added with the colour sets and the chooser were
+run as a group (12/12 caught) rather than as part of a full sweep, so run it
+again before a release rather than trusting that number.
+
+That group run is also what turned up a hole in the harness itself: it copies
+the viewer and the suites into a sandbox, and was not copying the GENERATED
+`tier_sets_data.py`. The import failed, the baseline run died, and the harness
+reported "the unmutated suite already fails" — so a missing data file read as
+a broken program. Fixed; any further generated module must be added to that
+copy list too. Its first run found three that survived,
 which is why the suite now builds deliberately non-convex scenes: a convex
 stone hides its own back faces *and* tiles its silhouette, so the cull and the
 depth sort can both break without changing a pixel.

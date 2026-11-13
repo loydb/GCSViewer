@@ -97,6 +97,41 @@ The window opens with them on; untick the box, or start with
 the other way round — it follows the window when you press **S**, and stays
 on the material colours for `--save` unless you ask with `--tier-colors`.
 
+**Ten colour sets**, from the dropdown at the **top right** of the window,
+above the stone — the same ones
+[facetdiagrams.org](https://facetdiagrams.org) offers. Two for normal vision
+(*None (Pastel)*, this viewer's own colours, and *None (Vibrant)*, the
+website's), and one for each of eight kinds of colour blindness:
+deuteranomaly, protanomaly, deuteranopia, protanopia, tritanomaly,
+tritanopia, achromatopsia and blue cone monochromacy. The last two are drawn
+**unshaded**, because lightness is the only cue those viewers have and
+shading would spend it.
+
+The button face carries the short name of the set that is on; the menu
+carries the full one, with the plain-English gloss beside the clinical name,
+because the menu is where the choice is made. The button is a fixed width, so
+the control does not move about as the set changes.
+
+The colours are not handed out in tier order — that would put near-alike
+colours on neighbours, which is the one thing the sets exist to prevent.
+Tiers that TOUCH (sharing a facet edge, not just a corner) are kept at least
+10 CIEDE2000 apart *as that viewer sees them*, and among the colours that
+qualify a tier takes the least-used one, so a design still shows variety.
+A set holds 16 colours, 12 for the monochromacies, and a design with more
+tiers than that reuses a colour on tiers that do not touch.
+
+**The set you pick is remembered** — the window opens on it next time.
+`--palette=ID` chooses one for a single run and `--palettes` lists them. A
+`--save` from the command line always takes the default unless `--palette=`
+says otherwise, so a sheet rendered by a script does not change because
+somebody picked a different set in the window last week.
+
+The sets and their distance tables come from Loyd's tier-colour research
+(*Tier Colors and Color Blindness*), and `scripts/gen_tier_sets.py` generates
+`tier_sets_data.py` from the same `palettes.json` the website generates its
+copy from, so no colour is typed by hand in either program and the two
+cannot drift apart.
+
 **Frosted facets** — the matte bands an edge-frosting tool leaves — draw
 without the highlight and under a fine stipple, so they are distinguishable
 from polished facets at a glance in all three themes. Under tier colours,
@@ -131,6 +166,7 @@ There is no `.asc` support, by design.
 | **↑ ↓** | tip the 3/4 view up and down |
 | **I** | show / hide the instructions table |
 | **C** | colour-code the tiers, on at startup (also the checkbox above the table) |
+| menu | which of the ten colour sets to use; remembered for next time |
 | **G** | grayscale |
 | **L** | tier labels |
 | **S** | save the sheet as a PNG next to the design |
@@ -204,6 +240,8 @@ python  gcs_viewer.py "stone.gcs"              # the window
 python  gcs_viewer.py "stone.gcs" --save       # write stone_views.png beside it
 python  gcs_viewer.py "stone.gcs" --save out.png --gray --no-labels
 python  gcs_viewer.py "stone.gcs" --save --tier-colors  # a colour per tier
+python  gcs_viewer.py "stone.gcs" --palette=deuteranopia  # one of the ten sets
+python  gcs_viewer.py --palettes               # list the colour sets
 python  gcs_viewer.py --selftest report.txt    # prove a build works
 python  gcs_viewer.py --version                # which build is this
 ```

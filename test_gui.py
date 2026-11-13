@@ -316,7 +316,13 @@ def main():
             # rather than the method behind it
             check("colours: the window offers a checkbox for them",
                   app.tier_check.winfo_exists() and
-                  "olour" in app.tier_check.cget("text"),
+                  app.tier_check.cget("text") == "Color-code tiers",
+                  app.tier_check.cget("text"))
+            # US spelling on the label, whatever the code calls it internally:
+            # the program is written in British English and read mostly by
+            # Americans, and "Colour" on a button reads as a typo to them
+            check("colours: the label is spelled the American way",
+                  "Colour" not in app.tier_check.cget("text"),
                   app.tier_check.cget("text"))
             # earlier checks in this run have toggled gray, which turns the
             # colours off - so put the state where this block needs it rather
@@ -336,6 +342,115 @@ def main():
                   len(set(map(tuple, app.palette.values()))) ==
                   len(app.palette) and len(app.palette) > 1,
                   len(app.palette))
+
+            # -- the colour-set menu --
+            # Ten sets: two for normal vision and one for each kind of
+            # colour blindness, the same ones the website offers.  Driven
+            # through the widget, because what matters is that the menu
+            # entry does the work, not that the method behind it does.
+            labels = [spec["label"] for spec in gv.TIER_SETS]
+            menu = app.tier_menu_items
+            entries = [menu.entrycget(i, "label")
+                       for i in range(menu.index("end") + 1)]
+            check("sets: the window offers every set",
+                  entries == labels, entries)
+            check("sets: it opens on the set it will use",
+                  app.tier_set_var.get() == gv.tier_set_brief(
+                      gv.tier_set(app.tier_set_id)["label"]),
+                  (app.tier_set_var.get(), app.tier_set_id))
+            # The chooser is the first control a user needs - before reading
+            # anything they pick the set that matches their own sight - so it
+            # sits ABOVE the stone and hard RIGHT, not below it with the
+            # toggles.  Asked of the geometry manager rather than of screen
+            # pixels, because this window is never mapped while under test.
+            topbar = app.root.nametowidget(app.tier_menu.winfo_parent())
+            order = app.root.pack_slaves()
+            check("sets: the chooser is above the stone",
+                  order.index(topbar) < order.index(app.label)
+                  and topbar.pack_info().get("side", "top") == "top",
+                  ([w.winfo_class() for w in order], topbar.pack_info()))
+            check("sets: and at the right edge",
+                  app.tier_menu.pack_info()["side"] == "right",
+                  app.tier_menu.pack_info())
+            check("sets: the top bar spans the window",
+                  topbar.pack_info()["fill"] == "x", topbar.pack_info())
+            # a set that changed the button's width would shift the whole
+            # control sideways every time it was used
+            widths = []
+            for spec in gv.TIER_SETS:
+                app.tier_set_var.set(gv.tier_set_brief(spec["label"]))
+                app.root.update_idletasks()
+                widths.append(app.tier_menu.winfo_reqwidth())
+            app.tier_set_var.set(gv.tier_set_brief(
+                gv.tier_set(app.tier_set_id)["label"]))
+            app.root.update_idletasks()
+            check("sets: the button does not change width with the set",
+                  len(set(widths)) == 1, widths)
+            check("sets: and that is the remembered one",
+                  app.tier_set_id == gv.remembered_tier_set(),
+                  (app.tier_set_id, gv.remembered_tier_set()))
+
+            # keep the test off the real preferences file
+            home = os.path.join(tmp, "gui-prefs")
+            keep = {k: os.environ.get(k)
+                    for k in ("APPDATA", "XDG_CONFIG_HOME")}
+            os.environ["APPDATA"] = home
+            os.environ["XDG_CONFIG_HOME"] = home
+            try:
+                if not app.tier_colors:
+                    app.tier_check.invoke()
+                    pump(app)
+                before = app._canvas.copy()
+                was = dict(app.palette)
+                menu.invoke(labels.index("Tritanopia (Blue-blind)"))
+                pump(app)
+                check("sets: picking one switches to it",
+                      app.tier_set_id == "tritanopia", app.tier_set_id)
+                check("sets: the menu shows what was picked",
+                      app.tier_set_var.get() == "Tritanopia",
+                      app.tier_set_var.get())
+                check("sets: the stone is recoloured",
+                      dict(app.palette) != was
+                      and list(app._canvas.getdata()) != list(before.getdata()))
+                check("sets: and the choice is written down at once",
+                      gv.load_prefs().get("tier_set") == "tritanopia",
+                      gv.load_prefs())
+
+                # a monochromacy set draws the stone unshaded: lightness is
+                # the only cue those viewers have
+                check("sets: an ordinary set is shaded", app._flat() is False)
+                menu.invoke(labels.index(
+                    "Achromatopsia / Rod Monochromacy (Total color blindness)"))
+                pump(app)
+                check("sets: a monochromacy set is drawn flat",
+                      app._flat() is True and app.tier_set_id == "achromatopsia",
+                      (app._flat(), app.tier_set_id))
+
+                # picking a set with the colours off would do nothing
+                # visible, which reads as a broken menu
+                app.tier_check.invoke()
+                pump(app)
+                check("sets: the colours are off now", app.tier_colors is False)
+                menu.invoke(labels.index("None (Vibrant)"))
+                pump(app)
+                check("sets: picking one turns the colours back on",
+                      app.tier_colors is True
+                      and app.tier_colors_var.get() == 1
+                      and app.tier_set_id == "vibrant",
+                      (app.tier_colors, app.tier_set_id))
+
+                # what a new window would open with
+                check("sets: a later run starts on the last one picked",
+                      gv.remembered_tier_set() == "vibrant",
+                      gv.remembered_tier_set())
+                menu.invoke(labels.index("None (Pastel)"))
+                pump(app)
+            finally:
+                for k, v in keep.items():
+                    if v is None:
+                        os.environ.pop(k, None)
+                    else:
+                        os.environ[k] = v
 
             # grayscale and tier colours both claim the facet colour: the one
             # asked for last wins, and the checkbox must not lie about it

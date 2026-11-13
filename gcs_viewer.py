@@ -31,6 +31,12 @@ Usage:
              --tier-colors     (a colour per tier; on by default in the
                                 window, opt-in for --save)
              --no-tier-colors  (open the window without them)
+             --palette=ID      (which colour set: --palettes lists them.
+                                The window remembers what you last picked;
+                                a --save always takes the default unless
+                                this says otherwise, so a scripted sheet
+                                does not depend on it)
+             --palettes        (list the colour sets and exit)
 
 Set GCS_VIEWER_NO_GUI=1 to make errors print to stderr instead of opening a
 message box, so unattended scripts cannot stall on a dialog.
@@ -39,7 +45,9 @@ message box, so unattended scripts cannot stall on a dialog.
 import sys
 import os
 import re
+import json
 import math
+import random
 import colorsys
 import xml.etree.ElementTree as ET
 
@@ -905,7 +913,7 @@ def _load_font(px):
 
 def render_view(facets, basis, scale, color, size=620, ss=2,
                 gray=False, labels=True, light=None, palette=None,
-                names=None):
+                names=None, flat=False):
     """Render one orthographic, flat-shaded panel as an RGB PIL image.
     light: optional unit vector overriding the global LIGHT -- pass an
     angled headlight (cam_dir tilted) so bottom/side views read as well
@@ -914,7 +922,10 @@ def render_view(facets, basis, scale, color, size=620, ss=2,
     colours each facet by its tier instead of by the material and takes
     precedence over both `color` and `gray`.
     names: optional {tier key: label} from tier_labels(); without it a
-    facet is captioned with whatever the file called its tier."""
+    facet is captioned with whatever the file called its tier.
+    flat: draw the tinted facets unshaded.  For the two monochromacy sets:
+    lightness is the only cue those viewers have, so shading would spend the
+    very thing that tells one tier from another."""
     right, up, forward, cam_dir = basis
     base_col = np.array((0.82, 0.82, 0.82) if gray else color, dtype=float)
 
@@ -967,13 +978,16 @@ def render_view(facets, basis, scale, color, size=620, ss=2,
             # hue carries the information, and the full ambient-to-lit swing
             # darkens a facing-away facet until two tiers are one colour.
             # Enough shading remains to keep the facets apart as shapes.
-            rgb = col * (TINT_AMBIENT + TINT_DIFFUSE * lam)
-            if frosted:
+            # Under a monochromacy set, not even that: see `flat`.
+            rgb = col if flat else col * (TINT_AMBIENT + TINT_DIFFUSE * lam)
+            if frosted and not flat:
                 # Keep the hue - it is what names the tier - but bloom it
                 # toward white.  Lifting rather than darkening is both what
                 # frost looks like and what keeps the stipple readable: the
                 # dots are drawn darker than their facet, and there is more
-                # room below a bloomed pastel than above it.
+                # room below a bloomed pastel than above it.  Skipped when
+                # flat: there the lightness IS the tier, and blooming would
+                # rewrite it.  The dots still mark the facet.
                 rgb = rgb * (1.0 - FROST_BLOOM) + FROST_BLOOM
         elif frosted:
             # matte: no specular highlight, softened diffuse - a frosted
@@ -1067,15 +1081,25 @@ def tier_keys(facets):
     return out
 
 
-def tier_palette(facets, sat=0.34, val=1.0):
-    """A distinct pastel colour per tier: {tier key: (r, g, b) in 0..1}.
+def tier_palette(facets, sat=0.34, val=1.0, set_id=None):
+    """A distinct colour per tier: {tier key: (r, g, b) in 0..1}.
 
     For reading the cutting order off the stone rather than judging its
     material colour - which tier is that facet, and did the tier I just cut
-    land where I meant it to.  Hues step by the golden angle, so adjacent
-    tiers (the ones most easily confused) never land on neighbouring hues
-    and a stone with forty tiers still separates.  Pale and unsaturated so
-    the shading still reads as shape: these are labels, not paint."""
+    land where I meant it to.
+
+    With `set_id`, one of the ten sets above, assigned so that touching tiers
+    are far apart as that viewer sees them.  Without it, the original
+    unbounded palette: hues step by the golden angle, so adjacent tiers (the
+    ones most easily confused) never land on neighbouring hues and a stone
+    with forty tiers still separates.  Pale and unsaturated so the shading
+    still reads as shape: these are labels, not paint.
+
+    The default stays None so that every caller written before the sets
+    existed - the demo animation, the solver scripts - draws exactly what it
+    always drew."""
+    if set_id is not None:
+        return tier_palette_set(facets, set_id)[0]
     order = []
     for k in tier_keys(facets):
         if k not in order:
@@ -1083,6 +1107,179 @@ def tier_palette(facets, sat=0.34, val=1.0):
     step = 0.6180339887498949                  # golden angle, in turns
     return {k: colorsys.hsv_to_rgb((i * step) % 1.0, sat, val)
             for i, k in enumerate(order)}
+
+
+# ----------------------------------------------------------------------------
+# Tier colour SETS: the same ten the website offers
+# ----------------------------------------------------------------------------
+#
+# Two sets for normal vision and one for each of eight kinds of colour
+# blindness, from Loyd's research (D:\Facetdiagrams.org\research\tier-colors,
+# "Tier Colors and Color Blindness v1.01.pdf").  tier_sets_data.py is
+# GENERATED from its palettes.json by scripts/gen_tier_sets.py - the same
+# source the website generates src/viewer/tierSetsData.ts from, so a colour
+# is never typed by hand in either program.
+#
+# "None (Pastel)" is this viewer's own golden-angle palette, its first 16
+# colours; "None (Vibrant)" is the website's default.  Neither corrects for
+# anything, which is why both are named "None".
+
+
+def _tier_sets_data():
+    """The generated data, imported however this module was loaded.
+
+    A plain `import tier_sets_data` is enough when the viewer is run or
+    imported normally.  It is NOT enough when something loads gcs_viewer.py
+    by PATH (importlib.spec_from_file_location, which the project's own
+    scratch scripts do), because then this file's folder is not on sys.path.
+    """
+    try:
+        from tier_sets_data import TIER_SETS_DATA
+        return TIER_SETS_DATA
+    except ImportError:
+        import importlib.util
+        here = os.path.dirname(os.path.abspath(__file__))
+        spec = importlib.util.spec_from_file_location(
+            "tier_sets_data", os.path.join(here, "tier_sets_data.py"))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod.TIER_SETS_DATA
+
+
+TIER_SETS = _tier_sets_data()
+# What the window opens with until the user picks something else.  Pastel
+# rather than the website's Vibrant: it is the palette this viewer has always
+# drawn, so an existing user sees the colours they know.
+DEFAULT_TIER_SET = "pastel"
+# Touching tiers must be at least this far apart as the viewer SEES them
+# (CIEDE2000; tier_assign.SEP).
+TIER_SET_SEP = 10.0
+# Vertex coordinates are compared at this many decimals when deciding whether
+# two facets share an edge (tier_adjacency.NDP).
+TIER_ADJ_NDP = 5
+
+
+def tier_set(set_id):
+    """One set by id, or the default when the id is unknown or None.
+
+    Unknown rather than an error on purpose: the id is remembered between
+    runs in a file a user can edit, and a stale one should open the viewer,
+    not break it."""
+    for spec in TIER_SETS:
+        if spec["id"] == set_id:
+            return spec
+    for spec in TIER_SETS:
+        if spec["id"] == DEFAULT_TIER_SET:
+            return spec
+    return TIER_SETS[0]
+
+
+def hex_rgb(h):
+    """"#rrggbb" -> (r, g, b) in 0..1."""
+    h = h.lstrip("#")
+    return tuple(int(h[i:i + 2], 16) / 255.0 for i in (0, 2, 4))
+
+
+def tier_adjacency(facets):
+    """(tier keys in order, {i: the tiers i touches}) - ported from
+    tier_adjacency.graph.
+
+    Two tiers TOUCH when a facet of one shares an EDGE with a facet of the
+    other.  A shared corner alone does not count, which is the map-colouring
+    convention and the thing that makes the result usable: two tiers meeting
+    at a point are not confusable the way two sharing a border are.
+    Coordinates are compared rounded, because the two facets either side of
+    an edge were cut separately and their vertices agree to about 1e-9, not
+    exactly."""
+    keys = tier_keys(facets)
+    order, index = [], {}
+    for k in keys:
+        if k not in index:
+            index[k] = len(order)
+            order.append(k)
+    edges = {}
+    for f, k in zip(facets, keys):
+        vs = [tuple(round(float(c), TIER_ADJ_NDP) for c in v)
+              for v in f["verts"]]
+        n = len(vs)
+        for i in range(n):
+            a, b = vs[i], vs[(i + 1) % n]
+            if a == b:
+                continue
+            edges.setdefault((a, b) if a < b else (b, a), set()).add(index[k])
+    adj = {i: set() for i in range(len(order))}
+    for shared in edges.values():
+        if len(shared) > 1:
+            for x in shared:
+                adj[x] |= shared - {x}
+    return order, adj
+
+
+def assign_tier_colors(ntiers, adj, D, sep=TIER_SET_SEP, tries=40, seed=0):
+    """Which colour each tier takes - a port of tier_assign.assign.
+
+    Numbering the tiers and numbering the colours and matching them up would
+    put near-alike colours side by side, which is the one thing these sets
+    exist to prevent.  So: tiers are taken most-constrained first (DSatur), a
+    tier may take a colour only if it is at least `sep` from every touching
+    tier already coloured AS THAT VIEWER SEES IT, and among the colours that
+    qualify it takes the least-used one, so a design still shows variety
+    rather than the minimum number of colours that would do.
+
+    When nothing qualifies the whole design is retried with a random
+    tie-break order (up to `tries`); only then is it a shortfall, and the
+    farthest colour is taken anyway.  Over the whole catalogue the research
+    measured no shortfall at all for eight of the ten sets.
+
+    Returns ({tier index: colour index}, shortfall)."""
+    rnd = random.Random(seed)
+    best = None
+    for t in range(tries):
+        jitter = {v: (rnd.random() if t else 0.0) for v in range(ntiers)}
+        color, short = _assign_once(ntiers, adj, D, sep, jitter)
+        if not short:
+            return color, False
+        if best is None:
+            best = color
+    return (best if best is not None else {}), True
+
+
+def _assign_once(ntiers, adj, D, sep, jitter):
+    k = len(D)
+    color, used = {}, [0] * k
+    short = False
+    while len(color) < ntiers:
+        def key(v):
+            return (len({color[u] for u in adj[v] if u in color}),
+                    len(adj[v]) + jitter[v], -v)
+        v = max((v for v in range(ntiers) if v not in color), key=key)
+        nb = [color[u] for u in adj[v] if u in color]
+
+        def gap(c):
+            return min((D[c][o] for o in nb), default=1e9)
+        ok = [c for c in range(k) if gap(c) >= sep]
+        if ok:
+            c = min(ok, key=lambda c: (used[c], -gap(c), c))
+        else:
+            c = max(range(k), key=gap)
+            short = True
+        color[v] = c
+        used[c] += 1
+    return color, short
+
+
+def tier_palette_set(facets, set_id):
+    """({tier key: (r, g, b)}, shortfall) for one of the ten sets.
+
+    A set holds 16 colours (12 for the two monochromacies) and a design may
+    have more tiers than that; colours are REUSED on tiers that do not touch,
+    which is what the assignment is for."""
+    spec = tier_set(set_id)
+    order, adj = tier_adjacency(facets)
+    color, short = assign_tier_colors(len(order), adj, spec["seenD"])
+    cols = spec["colors"]
+    return ({k: hex_rgb(cols[color.get(i, 0)]) for i, k in enumerate(order)},
+            short)
 
 
 PANEL_LABELS = ("Table (top)", "Pavilion (bottom)", "Side", "3/4 view")
@@ -1172,7 +1369,7 @@ def _fit_text(font, text, maxw, keep=8):
 
 
 def make_panels(facets, scale, color, angles34, size, ss, gray, labels,
-                palette=None, names=None):
+                palette=None, names=None, flat=False):
     # az=180 below: GCS presents its pavilion view flipped about the
     # VERTICAL axis (index 0 stays at the top, indices run CCW), so
     # match it rather than the 0-at-bottom horizontal-axis flip
@@ -1182,7 +1379,7 @@ def make_panels(facets, scale, color, angles34, size, ss, gray, labels,
              (view_basis(*angles34), None)]
     return [render_view(facets, b, scale, color, size=size, ss=ss,
                         gray=gray, labels=labels, light=lt, palette=palette,
-                        names=names)
+                        names=names, flat=flat)
             for b, lt in specs]
 
 
@@ -1567,8 +1764,78 @@ def _unique_path(path):
         i += 1
 
 
+def prefs_path():
+    """The file the window remembers its choices in.
+
+    Per user rather than per install: two people on one machine keep their
+    own, and an upgrade that replaces the .exe does not forget.  %APPDATA%
+    on Windows, the XDG config directory elsewhere."""
+    if os.name == "nt":
+        base = os.environ.get("APPDATA") or os.path.expanduser("~")
+        return os.path.join(base, "GCSViewer", "prefs.json")
+    base = (os.environ.get("XDG_CONFIG_HOME")
+            or os.path.join(os.path.expanduser("~"), ".config"))
+    return os.path.join(base, "gcsviewer", "prefs.json")
+
+
+def load_prefs():
+    """What was remembered, or {}.  Never raises.
+
+    A viewer that will not open because a preferences file is missing, or
+    unreadable, or was hand-edited into invalid JSON, is worse than a viewer
+    that forgets what you picked - so every failure here is a {}."""
+    try:
+        with open(prefs_path(), encoding="utf-8") as fh:
+            got = json.load(fh)
+        return got if isinstance(got, dict) else {}
+    except Exception:
+        return {}
+
+
+def save_prefs(**values):
+    """Merge `values` into the file.  Never raises; returns whether it wrote.
+
+    Merged rather than overwritten so a setting this build does not know
+    about survives it."""
+    try:
+        path = prefs_path()
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        data = load_prefs()
+        data.update(values)
+        with open(path, "w", encoding="utf-8", newline="\n") as fh:
+            json.dump(data, fh, indent=1, sort_keys=True)
+            fh.write("\n")
+        return True
+    except Exception:
+        return False
+
+
+def tier_set_brief(label):
+    """The short name for the button face, the full one staying in the menu.
+
+    The menu is where a user CHOOSES, so it carries the plain-English cue
+    with the clinical name ("Deuteranomaly (Green-weak)").  The button only
+    has to say which one is on, and at 74 characters the longest label would
+    make the control wider than the three render panels it sits over.
+
+    The trailing parenthetical and anything after a slash go, EXCEPT where
+    what is left would be "None" - the two normal-vision sets are told apart
+    by that parenthetical and by nothing else.
+    """
+    brief = label.split(" / ")[0]
+    cut = brief.split(" (")[0]
+    return brief if cut == "None" else cut
+
+
+def remembered_tier_set():
+    """The set the window last used, or the default if none was ever kept."""
+    want = load_prefs().get("tier_set")
+    return tier_set(want if isinstance(want, str) else None)["id"]
+
+
 class ViewerApp:
-    def __init__(self, path, gray=False, labels=True, tier_colors=True):
+    def __init__(self, path, gray=False, labels=True, tier_colors=True,
+                 tier_set_id=None):
         import tkinter as tk
         from PIL import ImageTk
         self.tk = tk
@@ -1578,6 +1845,8 @@ class ViewerApp:
         self.labels = labels
         self.show_instr = True
         self.tier_colors = tier_colors
+        # what --palette asked for, else what was picked last time
+        self.tier_set_id = tier_set(tier_set_id or remembered_tier_set())["id"]
         self.az, self.el = 35.0, 28.0
 
         self.panel = 460          # on-screen panel size
@@ -1594,6 +1863,42 @@ class ViewerApp:
         # the sheet is shown in two pieces - the renders, then the cutting
         # table - so the control row can sit between them, on the seam the
         # sheet already has
+        # The ten colour sets, the same ones the website offers: two for
+        # normal vision and one for each kind of colour blindness.  Top
+        # right, above the stone, because it is the control a user reaches
+        # for FIRST - before reading anything they pick the set that matches
+        # their own sight - and a chooser found after the fact has already
+        # failed the person it exists for.  A menu rather than a key: nobody
+        # cycles through ten of anything, and the names are the useful part.
+        topbar = tk.Frame(self.root, bg="#1a1a1e")
+        topbar.pack(fill="x", padx=PANEL_PAD + 4, pady=(6, 0))
+
+        self.tier_set_var = tk.StringVar(
+            value=tier_set_brief(tier_set(self.tier_set_id)["label"]))
+        self.tier_menu = tk.Menubutton(
+            topbar, textvariable=self.tier_set_var,
+            bg="#33333c", fg="#c8c8d0", activebackground="#3f3f4a",
+            activeforeground="#ffffff", highlightthickness=0, bd=0,
+            font=("Segoe UI", 10), anchor="w", takefocus=0,
+            indicatoron=1, relief="raised", direction="below",
+            # a fixed width so the window does not jump every time the set
+            # changes; sized to the longest brief name
+            width=max(len(tier_set_brief(spec["label"]))
+                      for spec in TIER_SETS) + 2)
+        self.tier_menu_items = tk.Menu(
+            self.tier_menu, tearoff=0,
+            bg="#23232a", fg="#c8c8d0", activebackground="#3f3f4a",
+            activeforeground="#ffffff", bd=0, font=("Segoe UI", 10))
+        for spec in TIER_SETS:
+            self.tier_menu_items.add_command(
+                label=spec["label"],
+                command=lambda lab=spec["label"]: self._choose_tier_set(lab))
+        self.tier_menu["menu"] = self.tier_menu_items
+        self.tier_menu.pack(side="right")
+
+        tk.Label(topbar, text="Tier colors", bg="#1a1a1e", fg="#9a9aa2",
+                 font=("Segoe UI", 10)).pack(side="right", padx=(0, 8))
+
         self.label = tk.Label(self.root, bg="#1a1a1e")
         self.label.pack()
 
@@ -1602,9 +1907,10 @@ class ViewerApp:
         # having to remember whether you pressed the key
         controls = tk.Frame(self.root, bg="#1a1a1e")
         controls.pack(fill="x", padx=PANEL_PAD + 4, pady=(5, 1))
+
         self.tier_colors_var = tk.IntVar(value=int(self.tier_colors))
         self.tier_check = tk.Checkbutton(
-            controls, text="Colour-code tiers", variable=self.tier_colors_var,
+            controls, text="Color-code tiers", variable=self.tier_colors_var,
             command=self._toggle_tier_colors, bg="#1a1a1e", fg="#c8c8d0",
             activebackground="#1a1a1e", activeforeground="#e8e8f0",
             selectcolor="#33333a", highlightthickness=0, bd=0,
@@ -1655,8 +1961,11 @@ class ViewerApp:
         self.color = material["color"]
         self.scale = world_scale(facets)
         # per design: stepping to the next stone must recolour, or tier 3 of
-        # this design would wear the colour of tier 3 of the last one
-        self.palette = tier_palette(facets)
+        # this design would wear the colour of tier 3 of the last one.  The
+        # colours are ASSIGNED against this design's own adjacency, so they
+        # cannot be carried over even in principle.
+        self.palette, self.tier_short = tier_palette_set(facets,
+                                                         self.tier_set_id)
         self.names = tier_labels(facets)
 
     _natural_key = staticmethod(natural_key)
@@ -1696,26 +2005,30 @@ class ViewerApp:
     def _palette(self):
         return self.palette if self.tier_colors else None
 
+    def _flat(self):
+        """Draw the tinted stone unshaded? Only the two monochromacies."""
+        return bool(self.tier_colors and tier_set(self.tier_set_id)["flat"])
+
     def _render_static(self):
-        pal = self._palette()
+        pal, flat = self._palette(), self._flat()
         self.p_top = render_view(self.facets, view_basis(0, 90), self.scale,
                                  self.color, self.panel, self.ss_static,
                                  self.gray, self.labels, palette=pal,
-                                 names=self.names)
+                                 names=self.names, flat=flat)
         self.p_pav = render_view(self.facets, view_basis(180, -90), self.scale,
                                  self.color, self.panel, self.ss_static,
                                  self.gray, self.labels, light=LIGHT_BELOW,
-                                 palette=pal, names=self.names)
+                                 palette=pal, names=self.names, flat=flat)
         self.p_side = render_view(self.facets, view_basis(0, 0), self.scale,
                                   self.color, self.panel, self.ss_static,
                                   self.gray, self.labels, palette=pal,
-                                  names=self.names)
+                                  names=self.names, flat=flat)
 
     def _render_dynamic(self, ss):
         self.p_34 = render_view(self.facets, view_basis(self.az, self.el),
                                 self.scale, self.color, self.panel, ss,
                                 self.gray, self.labels, palette=self._palette(),
-                                names=self.names)
+                                names=self.names, flat=self._flat())
 
     def _composite_and_show(self):
         instr_img = None
@@ -1794,6 +2107,30 @@ class ViewerApp:
         self._render_dynamic(self.ss_static)
         self._composite_and_show()
 
+    def _choose_tier_set(self, label):
+        """The menu's command: switch sets, remember it, redraw.
+
+        Remembered immediately rather than at exit, because the viewer is
+        usually closed with Esc or the window button and a preference that
+        only survives a graceful shutdown is a preference that goes missing.
+        Turning the sets on is implied: picking one with the colours off
+        would otherwise do nothing visible, which reads as a broken menu."""
+        for spec in TIER_SETS:
+            if spec["label"] == label:
+                self.tier_set_id = spec["id"]
+                self.tier_set_var.set(tier_set_brief(label))
+                break
+        save_prefs(tier_set=self.tier_set_id)
+        self.palette, self.tier_short = tier_palette_set(self.facets,
+                                                         self.tier_set_id)
+        if not self.tier_colors:
+            self.tier_colors_var.set(1)
+            self._toggle_tier_colors()
+            return
+        self._render_static()
+        self._render_dynamic(self.ss_static)
+        self._composite_and_show()
+
     def _toggle_instr(self):
         # only the composite changes (no re-render); the table strip
         # grows and shrinks, so the window height does too
@@ -1812,7 +2149,8 @@ class ViewerApp:
         panels = make_panels(self.facets, self.scale, self.color,
                              (self.az, self.el), size=680, ss=3,
                              gray=self.gray, labels=self.labels,
-                             palette=self._palette(), names=self.names)
+                             palette=self._palette(), names=self.names,
+                             flat=self._flat())
         instr_img = None
         if self.show_instr:
             rows = tier_table(self.facets, gear=self.info.get("gear", 96.0))
@@ -2046,6 +2384,25 @@ def main(argv):
     if "--selftest" in flags:
         return _selftest(args[0] if args else None)
 
+    if "--palettes" in flags:
+        _tell("\n".join("%-14s %s%s" % (spec["id"], spec["label"],
+                                        "  (drawn unshaded)" if spec["flat"]
+                                        else "")
+                        for spec in TIER_SETS))
+        return 0
+
+    # --palette=ID rather than --palette ID: the argument would otherwise be
+    # taken for the design to open, this parser having no notion of a flag
+    # that consumes the next word.
+    want_set = None
+    for f in flags:
+        if f.startswith("--palette="):
+            want_set = f.split("=", 1)[1].strip()
+    if want_set is not None and not any(spec["id"] == want_set
+                                        for spec in TIER_SETS):
+        _tell("no such colour set: %s\n--palettes lists them" % want_set)
+        return 2
+
     if not args:
         # Scripted callers keep the old contract: usage on stdout, exit 2.
         # A person who launched it from the Start Menu gets a file picker
@@ -2088,10 +2445,16 @@ def main(argv):
         else:
             out = _unique_path(os.path.splitext(path)[0] + "_views.png")
         scale = world_scale(facets)
+        # The set is whatever --palette= asked for, else the default -
+        # never the window's remembered choice.  A sheet rendered by a script
+        # must not change because somebody picked a different set in the GUI
+        # last week.
+        set_id = want_set or DEFAULT_TIER_SET
+        pal = tier_palette(facets, set_id=set_id) if save_tint else None
         panels = make_panels(facets, scale, material["color"], (35, 28),
                              size=680, ss=3, gray=gray, labels=labels,
-                             palette=tier_palette(facets) if save_tint
-                             else None, names=tier_labels(facets))
+                             palette=pal, names=tier_labels(facets),
+                             flat=bool(save_tint and tier_set(set_id)["flat"]))
         rows = tier_table(facets, gear=info.get("gear", 96.0))
         instr_img = render_instructions(rows, width=instr_width(680), gray=gray)
         try:
@@ -2104,7 +2467,7 @@ def main(argv):
 
     try:
         ViewerApp(path, gray=gray, labels=labels,
-                  tier_colors=window_tint).run()
+                  tier_colors=window_tint, tier_set_id=want_set).run()
     except Exception as e:
         _error_window(f"Could not read:\n{os.path.basename(path)}\n\n{e}")
         return 1
