@@ -61,7 +61,7 @@ PIECES = [
             controls, text="Render", command=self.open_render_window,
             bg="#33333c", fg="#c8c8d0", activebackground="#3f3f4a",
             activeforeground="#ffffff", bd=0, padx=12, pady=2,
-            font=("Segoe UI", 10), takefocus=0)
+            font=(UI_FONT, UI_PT), takefocus=0)
         self.render_button.pack(side="left", padx=(0, 12))
 ''', ""),
     ("open_render_window()", '''    def open_render_window(self):

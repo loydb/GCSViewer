@@ -374,6 +374,39 @@ def main():
                   app.tier_menu.pack_info())
             check("sets: the top bar spans the window",
                   topbar.pack_info()["fill"] == "x", topbar.pack_info())
+            # it is named for the SIGHT it serves, not for what the viewer
+            # paints: somebody looking for it is looking for that word
+            check("sets: the chooser is named for colour blindness",
+                  app.tier_caption.cget("text") == "Color Blindness Mode",
+                  app.tier_caption.cget("text"))
+            check("sets: spelled the American way",
+                  "Colour" not in app.tier_caption.cget("text"),
+                  app.tier_caption.cget("text"))
+            # a control for people who may not see the difference between
+            # two tier colours has no business being the dimmest, smallest
+            # thing on screen - it is read before the stone, not beside it
+            def pt(w):
+                f = str(w.cget("font"))
+                return int(f.strip("{}").split()[-1])
+
+            def lum(w):
+                h = w.cget("foreground").lstrip("#")
+                r, g, b = (int(h[i:i + 2], 16) for i in (0, 2, 4))
+                return 0.299 * r + 0.587 * g + 0.114 * b
+
+            check("sets: the caption is larger than the controls below",
+                  pt(app.tier_caption) > pt(app.tier_check),
+                  (pt(app.tier_caption), pt(app.tier_check)))
+            check("sets: and the chooser with it",
+                  pt(app.tier_menu) == pt(app.tier_caption),
+                  (pt(app.tier_menu), pt(app.tier_caption)))
+            check("sets: the caption is brighter than the status line",
+                  lum(app.tier_caption) > lum(app.status) + 30,
+                  (lum(app.tier_caption), lum(app.status)))
+            # it sat against the title bar before
+            check("sets: there is a gap above it",
+                  int(str(topbar.pack_info()["pady"]).strip("()").split(
+                      ",")[0]) >= 10, topbar.pack_info()["pady"])
             # a set that changed the button's width would shift the whole
             # control sideways every time it was used
             widths = []

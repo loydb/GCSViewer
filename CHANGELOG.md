@@ -213,6 +213,17 @@ executable whose frozen code does not match the committed source.
   monochromacy draw the stone **unshaded**: lightness is all those viewers
   have to tell one tier from another, and the ordinary tint shading would
   spend it.
+- **Called *Color Blindness Mode***, larger and brighter than the controls
+  under the stone, with a clear gap above it (Loyd, 2026-11-13: "Rename this
+  'Color Blindness Mode', make the font larger and brighter, and add some
+  padding above so it doesn't hit the title bar"). Named for the sight it
+  serves rather than for what the viewer paints — somebody looking for it is
+  looking for that word. Packed tight it had sat against the title bar and
+  read as window chrome rather than as the window's own first control, and at
+  the toggles' weight it was the dimmest, smallest thing on a screen whose
+  whole point is people who may not see two tier colours apart. `UI_PT` and
+  `TOPBAR_PT` now hold the two sizes instead of a point size repeated at
+  every widget.
 - **Above the stone and hard right**, not below it with the toggles. This is
   the control a user reaches for FIRST — before reading anything, they pick
   the set that matches their own sight — and a chooser found only after the

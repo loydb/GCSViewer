@@ -189,9 +189,9 @@ MUTATIONS = [
      "        pass"),
     ("put the colour-set chooser BELOW the stone, where it is found only "
      "after the reading it should have come before",
-     '        topbar.pack(fill="x", padx=PANEL_PAD + 4, pady=(6, 0))',
+     '        topbar.pack(fill="x", padx=PANEL_PAD + 4, pady=(14, 2))',
      '        topbar.pack(side="bottom", fill="x", padx=PANEL_PAD + 4, '
-     'pady=(6, 0))'),
+     'pady=(14, 2))'),
     ("leave the chooser at the LEFT edge of the top bar",
      '        self.tier_menu.pack(side="right")',
      '        self.tier_menu.pack(side="left")'),
@@ -199,6 +199,20 @@ MUTATIONS = [
      "every time the set changes",
      '    return brief if cut == "None" else cut',
      "    return label"),
+    ("name the chooser after what the viewer paints rather than after the "
+     "sight it serves",
+     '            topbar, text="Color Blindness Mode", bg="#1a1a1e",',
+     '            topbar, text="Tier colors", bg="#1a1a1e",'),
+    ("pack the top bar tight against the title bar",
+     "        topbar.pack(fill=\"x\", padx=PANEL_PAD + 4, pady=(14, 2))",
+     "        topbar.pack(fill=\"x\", padx=PANEL_PAD + 4, pady=(0, 2))"),
+    ("draw the colour-blindness control at the same size as the toggles "
+     "below it",
+     "TOPBAR_PT = 12          # the colour-set chooser above it",
+     "TOPBAR_PT = UI_PT"),
+    ("dim the caption to the colour of the status line",
+     '            fg="#e8e8f0", font=(UI_FONT, TOPBAR_PT))',
+     '            fg="#9a9aa2", font=(UI_FONT, TOPBAR_PT))'),
 ]
 
 # labels above that only the windowed suite can catch
@@ -212,6 +226,12 @@ GUI_ONLY = {
     "put the colour-set chooser BELOW the stone, where it is found only "
     "after the reading it should have come before",
     "leave the chooser at the LEFT edge of the top bar",
+    "name the chooser after what the viewer paints rather than after the "
+    "sight it serves",
+    "pack the top bar tight against the title bar",
+    "draw the colour-blindness control at the same size as the toggles "
+    "below it",
+    "dim the caption to the colour of the status line",
 }
 
 # labels that only a platform whose native line ending is not LF can catch:

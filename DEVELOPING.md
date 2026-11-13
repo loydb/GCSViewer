@@ -59,7 +59,7 @@ drift from what the program produces.
 
 ```bash
 python test_gcs_viewer.py     # 403 checks
-python test_gui.py            # 69 checks, the window itself
+python test_gui.py            # 75 checks, the window itself
 ```
 
 No fixtures on disk and no third-party design files: every stone is
@@ -86,9 +86,9 @@ the viewer's port over real designs and compares, tier for tier.
 Reintroduces deliberate defects one at a time — dropping the `.gem` Y mirror,
 painting nearest-first, ignoring the gear, handing a colour set out in tier
 order instead of assigning it, putting the colour-set chooser below the stone
-— and reports which checks catch each. **48 mutations**; the last FULL sweep
-was green at 36. The twelve added with the colour sets and the chooser were
-run as a group (12/12 caught) rather than as part of a full sweep, so run it
+— and reports which checks catch each. **52 mutations**; the last FULL sweep
+was green at 36. The seventeen added with the colour sets and the chooser were
+run in groups (12/12 and 5/5 caught) rather than as part of a full sweep, so run it
 again before a release rather than trusting that number.
 
 That group run is also what turned up a hole in the harness itself: it copies

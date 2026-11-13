@@ -97,8 +97,8 @@ The window opens with them on; untick the box, or start with
 the other way round — it follows the window when you press **S**, and stays
 on the material colours for `--save` unless you ask with `--tier-colors`.
 
-**Ten colour sets**, from the dropdown at the **top right** of the window,
-above the stone — the same ones
+**Ten colour sets**, from **Color Blindness Mode** at the **top right** of
+the window, above the stone — the same ones
 [facetdiagrams.org](https://facetdiagrams.org) offers. Two for normal vision
 (*None (Pastel)*, this viewer's own colours, and *None (Vibrant)*, the
 website's), and one for each of eight kinds of colour blindness:
@@ -106,6 +106,11 @@ deuteranomaly, protanomaly, deuteranopia, protanopia, tritanomaly,
 tritanopia, achromatopsia and blue cone monochromacy. The last two are drawn
 **unshaded**, because lightness is the only cue those viewers have and
 shading would spend it.
+
+It is named for the sight it serves rather than for what the viewer
+paints, and is set larger and brighter than the toggles under the stone: a
+control for people who may not see the difference between two tier colours
+has no business being the dimmest thing on screen.
 
 The button face carries the short name of the set that is on; the menu
 carries the full one, with the plain-English gloss beside the clinical name,

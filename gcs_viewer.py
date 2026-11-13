@@ -1286,6 +1286,14 @@ PANEL_LABELS = ("Table (top)", "Pavilion (bottom)", "Side", "3/4 view")
 
 PANEL_PAD = 16          # compose()'s gutter, and its margin at both ends
 
+# The window's own chrome.  The top bar is set larger and brighter than the
+# toggles below it: the colour-set chooser is read BEFORE the stone, by
+# somebody who may not see the difference between two tier colours at all,
+# and a control for them has no business being the dimmest thing on screen.
+UI_FONT = "Segoe UI"
+UI_PT = 10              # the control row under the stone
+TOPBAR_PT = 12          # the colour-set chooser above it
+
 
 def instr_width(panel, n=len(PANEL_LABELS), pad=PANEL_PAD):
     """Width of the instruction table under `n` panels of `panel` pixels.
@@ -1871,24 +1879,28 @@ class ViewerApp:
         # failed the person it exists for.  A menu rather than a key: nobody
         # cycles through ten of anything, and the names are the useful part.
         topbar = tk.Frame(self.root, bg="#1a1a1e")
-        topbar.pack(fill="x", padx=PANEL_PAD + 4, pady=(6, 0))
+        # a clear gap above: packed tight, the control sat against the title
+        # bar and read as part of the window chrome rather than as the
+        # window's own first control
+        topbar.pack(fill="x", padx=PANEL_PAD + 4, pady=(14, 2))
 
         self.tier_set_var = tk.StringVar(
             value=tier_set_brief(tier_set(self.tier_set_id)["label"]))
         self.tier_menu = tk.Menubutton(
             topbar, textvariable=self.tier_set_var,
-            bg="#33333c", fg="#c8c8d0", activebackground="#3f3f4a",
+            bg="#33333c", fg="#e8e8f0", activebackground="#3f3f4a",
             activeforeground="#ffffff", highlightthickness=0, bd=0,
-            font=("Segoe UI", 10), anchor="w", takefocus=0,
+            font=(UI_FONT, TOPBAR_PT), anchor="w", takefocus=0,
             indicatoron=1, relief="raised", direction="below",
+            padx=8, pady=3,
             # a fixed width so the window does not jump every time the set
             # changes; sized to the longest brief name
             width=max(len(tier_set_brief(spec["label"]))
                       for spec in TIER_SETS) + 2)
         self.tier_menu_items = tk.Menu(
             self.tier_menu, tearoff=0,
-            bg="#23232a", fg="#c8c8d0", activebackground="#3f3f4a",
-            activeforeground="#ffffff", bd=0, font=("Segoe UI", 10))
+            bg="#23232a", fg="#e8e8f0", activebackground="#3f3f4a",
+            activeforeground="#ffffff", bd=0, font=(UI_FONT, TOPBAR_PT))
         for spec in TIER_SETS:
             self.tier_menu_items.add_command(
                 label=spec["label"],
@@ -1896,8 +1908,15 @@ class ViewerApp:
         self.tier_menu["menu"] = self.tier_menu_items
         self.tier_menu.pack(side="right")
 
-        tk.Label(topbar, text="Tier colors", bg="#1a1a1e", fg="#9a9aa2",
-                 font=("Segoe UI", 10)).pack(side="right", padx=(0, 8))
+        # "Color Blindness Mode", not "Tier colors" (Loyd, 2026-11-13): the
+        # sets are named for the sight they are FOR, and a user looking for
+        # them is looking for that word, not for what the viewer calls the
+        # thing it paints.  Brighter and larger than the controls below,
+        # because this one is read before the stone, not alongside it.
+        self.tier_caption = tk.Label(
+            topbar, text="Color Blindness Mode", bg="#1a1a1e",
+            fg="#e8e8f0", font=(UI_FONT, TOPBAR_PT))
+        self.tier_caption.pack(side="right", padx=(0, 10))
 
         self.label = tk.Label(self.root, bg="#1a1a1e")
         self.label.pack()
@@ -1914,14 +1933,14 @@ class ViewerApp:
             command=self._toggle_tier_colors, bg="#1a1a1e", fg="#c8c8d0",
             activebackground="#1a1a1e", activeforeground="#e8e8f0",
             selectcolor="#33333a", highlightthickness=0, bd=0,
-            font=("Segoe UI", 10), takefocus=0)
+            font=(UI_FONT, UI_PT), takefocus=0)
         self.tier_check.pack(side="left")
 
         self.instr_label = tk.Label(self.root, bg="#1a1a1e")
         self.instr_label.pack()
 
         self.status = tk.Label(self.root, bg="#1a1a1e", fg="#9a9aa2",
-                               font=("Segoe UI", 10), pady=4)
+                               font=(UI_FONT, UI_PT), pady=4)
         self.status.pack(fill="x")
 
         self._render_static()
